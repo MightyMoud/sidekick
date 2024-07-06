@@ -49,14 +49,40 @@ to quickly create a Cobra application.`,
 			putils.LettersFromStringWithStyle("Side", pterm.FgCyan.ToStyle()),
 			putils.LettersFromStringWithStyle("kick", pterm.FgLightMagenta.ToStyle())).Srender()
 		pterm.DefaultCenter.Println(s)
+		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
 
 		// get server address
 		server := ""
-		textInput := pterm.DefaultInteractiveTextInput
-		textInput.DefaultText = "Please enter the IPv4 Address of your VPS"
-		server, _ = textInput.Show()
+		serverTextInput := pterm.DefaultInteractiveTextInput
+		serverTextInput.DefaultText = "Please enter the IPv4 Address of your VPS"
+		server, _ = serverTextInput.Show()
 		if !utils.IsValidIPAddress(server) {
 			pterm.Error.Printfln("You entered an incorrect IP Address - %s", server)
+			os.Exit(0)
+		}
+
+		dockerRegistery := ""
+		dockerRegisteryTextInput := pterm.DefaultInteractiveTextInput.WithDefaultValue("docker.io")
+		dockerRegisteryTextInput.DefaultText = "Please enter your docker registery"
+		dockerRegistery, _ = dockerRegisteryTextInput.Show()
+
+		dockerUsername := ""
+		dokerUsernameTextInput := pterm.DefaultInteractiveTextInput
+		dokerUsernameTextInput.DefaultText = "Please enter your docker username for the registery"
+		dockerUsername, _ = dokerUsernameTextInput.Show()
+		if dockerUsername == "" {
+			pterm.Error.Println("You have to enter your docker username")
+			os.Exit(0)
+		}
+
+		prompt := pterm.DefaultInteractiveContinue
+		prompt.DefaultText = "Are you logged in to the docker registery?"
+		prompt.Options = []string{"yes", "no"}
+		if result, _ := prompt.Show(); result != "yes" {
+			pterm.Println()
+			pterm.Error.Printfln("You need to login to your docker registery %s", dockerRegistery)
+			pterm.Info.Printfln("You can do so by running `docker login %s`", dockerRegistery)
+			pterm.Println()
 			os.Exit(0)
 		}
 
@@ -70,6 +96,8 @@ to quickly create a Cobra application.`,
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("$HOME/.config/sidekick/")
 		viper.Set("serverAddress", server)
+		viper.Set("dockerRegistery", dockerRegistery)
+		viper.Set("dockerUsername", dockerUsername)
 
 		multi := pterm.DefaultMultiPrinter
 		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(4).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
