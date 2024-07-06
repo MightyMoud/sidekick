@@ -23,11 +23,13 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 
 	"github.com/ms-mousa/sidekick/utils"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // initCmd represents the init command
@@ -48,6 +50,7 @@ to quickly create a Cobra application.`,
 			putils.LettersFromStringWithStyle("kick", pterm.FgLightMagenta.ToStyle())).Srender()
 		pterm.DefaultCenter.Println(s)
 
+		// get server address
 		server := ""
 		textInput := pterm.DefaultInteractiveTextInput
 		textInput.DefaultText = "Please enter the IPv4 Address of your VPS"
@@ -56,6 +59,17 @@ to quickly create a Cobra application.`,
 			pterm.Error.Printfln("You entered an incorrect IP Address - %s", server)
 			os.Exit(0)
 		}
+
+		keyAddSshCommand := exec.Command("./prelude.sh", server)
+		if sshAddErr := keyAddSshCommand.Run(); sshAddErr != nil {
+			panic(sshAddErr)
+		}
+
+		// setup viper for config
+		viper.SetConfigName("sidekick")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("$HOME/.config/sidekick/")
+		viper.Set("serverAddress", server)
 
 		multi := pterm.DefaultMultiPrinter
 		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(4).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
@@ -79,6 +93,10 @@ to quickly create a Cobra application.`,
 		}
 
 		if err := utils.RunStage(sshClient, utils.GetTraefikStage(server), stage3Spinner, setupProgressBar); err != nil {
+			panic(err)
+		}
+
+		if err := viper.WriteConfig(); err != nil {
 			panic(err)
 		}
 
