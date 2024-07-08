@@ -11,13 +11,3 @@ func GetSpinner() pterm.SpinnerPrinter {
 	stagedSpinner.ShowTimer = false
 	return stagedSpinner
 }
-
-func GetSpinners(multi pterm.MultiPrinter, titles []string) []*pterm.SpinnerPrinter {
-	spinners := make([]*pterm.SpinnerPrinter, len(titles))
-	for i, title := range titles {
-		newSpinner := GetSpinner().WithWriter(multi.NewWriter()).WithText(title)
-		spinners[i] = newSpinner
-		newSpinner.Start()
-	}
-	return spinners
-}

@@ -24,6 +24,7 @@ package cmd
 import (
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/ms-mousa/sidekick/utils"
 	"github.com/pterm/pterm"
@@ -36,12 +37,9 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Init sidekick CLI and configure your VPS to host your apps",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Long: `This command will run you throgh the setup steps to get sidekick loaded on your VPS.
+		You wil neede to provide your VPS IPv4 address and a registery to host your docker images.
+		`,
 	Run: func(cmd *cobra.Command, args []string) {
 		pterm.Println()
 
@@ -86,9 +84,10 @@ to quickly create a Cobra application.`,
 			os.Exit(0)
 		}
 
-		keyAddSshCommand := exec.Command("./prelude.sh", server)
-		if sshAddErr := keyAddSshCommand.Run(); sshAddErr != nil {
-			panic(sshAddErr)
+		preludeCmd := exec.Command("sh", "-s", "-", server)
+		preludeCmd.Stdin = strings.NewReader(utils.PreludeScript)
+		if preludeCmdErr := preludeCmd.Run(); preludeCmdErr != nil {
+			panic(preludeCmdErr)
 		}
 
 		// setup viper for config

@@ -109,7 +109,7 @@ func RunCommand(client *ssh.Client, cmd string) error {
 		errString := <-errChannel
 		return fmt.Errorf("error running command - %s: - %s", cmd, errString)
 	}
-	time.Sleep(time.Millisecond * 200)
+	time.Sleep(time.Millisecond * 500)
 	// fmt.Println("Ran command successfully!")
 	return nil
 }
@@ -150,16 +150,24 @@ func LoginStage(server string, spinner *pterm.SpinnerPrinter, progressBar *pterm
 }
 
 func IsValidIPAddress(ip string) bool {
-	// Regular expression for matching an IPv4 address
 	const ipPattern = `\b(?:\d{1,3}\.){3}\d{1,3}\b`
 
-	// Compile the regular expression
 	re := regexp.MustCompile(ipPattern)
 
-	// Check if the string matches the pattern
 	if re.MatchString(ip) {
 		return true
 	}
 
+	return false
+}
+
+func FileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
 	return false
 }

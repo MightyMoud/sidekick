@@ -17,7 +17,8 @@ var DockerStage = CommandsStage{
 	SpinnerFailMessage:    "Error happened during setting up docker",
 	Commands: []string{
 		"sudo apt-get update -y",
-		"sudo apt-get install ca-certificates curl -y",
+		"sudo apt-get install curl -y",
+		"sudo apt-get install ca-certificates -y",
 		"sudo install -m 0755 -d /etc/apt/keyrings",
 		"sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc",
 		"sudo chmod a+r /etc/apt/keyrings/docker.asc",
@@ -25,6 +26,7 @@ var DockerStage = CommandsStage{
 		"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
 		$(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
 		sudo tee /etc/apt/sources.list.d/docker.list > /dev/null`,
+		"sudo apt-get update -y",
 		"sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y",
 	},
 }
@@ -37,6 +39,7 @@ func GetTraefikStage(server string) CommandsStage {
 			"sudo apt-get install git -y",
 			"git clone https://github.com/ms-mousa/sidekick-traefik.git",
 			fmt.Sprintf(`cd sidekick-traefik && sed -i.bak "s/\$HOST/%s/g; s/\$PORT/%s/g" docker-compose.traefik.yml && rm docker-compose.traefik.yml.bak`, server, "8000"),
+			"docker network create sidekick",
 			"cd sidekick-traefik && docker compose -p sidekick -f docker-compose.traefik.yml up -d",
 		},
 	}

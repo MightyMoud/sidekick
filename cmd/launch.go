@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/ms-mousa/sidekick/utils"
 	"github.com/pterm/pterm"
@@ -33,50 +35,90 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type DockerService struct {
-	Image   string   `yaml:"image"`
-	Command string   `yaml:"command,omitempty"`
-	Ports   []string `yaml:"ports,omitempty"`
-	Volumes []string `yaml:"volumes,omitempty"`
-	Labels  []string `yaml:"labels,omitempty"`
-}
-
-type DockerComposeFile struct {
-	Services map[string]DockerService `yaml:"services"`
-}
-
-// launchCmd represents the launch command
 var launchCmd = &cobra.Command{
 	Use:   "launch",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Launch a new application to host on your VPS with Sidekick",
+	Long:  `This command will run you through the basic setup to add a new application to your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		viper.SetConfigName("sidekick")
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("$HOME/.config/sidekick/")
-		err := viper.ReadInConfig() // Find and read the config file
-		if err != nil {             // Handle errors reading the config file
+		err := viper.ReadInConfig()
+		if err != nil {
 			panic(fmt.Errorf("fatal error config file: %w", err))
 		}
-		adonis := DockerService{
-			Image: "msmousa/adonis-test",
+
+		keyAddSshCommand := exec.Command("sh", "-s", "-", viper.Get("serverAddress").(string))
+		keyAddSshCommand.Stdin = strings.NewReader(utils.SshKeysScript)
+		if sshAddErr := keyAddSshCommand.Run(); sshAddErr != nil {
+			panic(sshAddErr)
+		}
+
+		if utils.FileExists("./dockerfile") {
+			pterm.Info.Println("Dockerfile detected - scanning file for details")
+		} else {
+			pterm.Error.Println("No dockerfiles found in current directory.")
+		}
+		pterm.Info.Println("Analyzing docker file...")
+		res, err := os.ReadFile("./Dockerfile")
+		if err != nil {
+			pterm.Error.Println("Unable to process your dockerfile")
+		}
+		// attempt to get a port from dockerfile
+		appPort := ""
+		for _, line := range strings.Split(string(res), "\n") {
+			if strings.HasPrefix(line, "EXPOSE") {
+				appPort = line[len(line)-4:]
+			}
+		}
+
+		appName := ""
+		appNameTextInput := pterm.DefaultInteractiveTextInput
+		appNameTextInput.DefaultText = "Please enter your app url friendly app name"
+		appName, _ = appNameTextInput.Show()
+		if appName == "" || strings.Contains(appName, " ") {
+			pterm.Error.Println("You have to enter url friendly app name")
+			os.Exit(0)
+		}
+
+		appPortTextInput := pterm.DefaultInteractiveTextInput.WithDefaultValue(appPort)
+		appPortTextInput.DefaultText = "Please enter the port at which the app receives request"
+		appPort, _ = appPortTextInput.Show()
+		if appPort == "" {
+			pterm.Error.Println("You you have to enter a port to accept requests")
+			os.Exit(0)
+		}
+
+		appDomain := ""
+		appDomainTextInput := pterm.DefaultInteractiveTextInput.WithDefaultValue(fmt.Sprintf("%s.%s.sslip.io", appName, viper.Get("serverAddress").(string)))
+		appDomainTextInput.DefaultText = "Please enter the domain to point the app to"
+		appDomain, _ = appDomainTextInput.Show()
+
+		// make a docker service
+		imageName := fmt.Sprintf("%s/%s", viper.Get("dockerUsername").(string), appName)
+		newService := DockerService{
+			Image: imageName,
 			Labels: []string{
 				"traefik.enable=true",
-				fmt.Sprintf("traefik.http.routers.frontend.rule=Host(`fe.%s.sslip.io`)", viper.Get("serverAddress")),
-				"traefik.http.services.frontend.loadbalancer.server.port=3000",
-				"traefik.http.routers.frontend.tls=true",
-				"traefik.http.routers.frontend.tls.certresolver=default",
+				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", appName, appDomain),
+				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", appName, appPort),
+				fmt.Sprintf("traefik.http.routers.%s.tls=true", appName),
+				fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=default", appName),
+				"traefik.docker.network=sidekick",
+			},
+			Networks: []string{
+				"sidekick",
 			},
 		}
 		newDockerCompose := DockerComposeFile{
 			Services: map[string]DockerService{
-				"adonis": adonis,
+				appName: newService,
+			},
+			Networks: map[string]DockerNetwork{
+				"sidekick": {
+					External: true,
+				},
 			},
 		}
 		dockerComposeFile, err := yaml.Marshal(&newDockerCompose)
@@ -89,11 +131,13 @@ to quickly create a Cobra application.`,
 			fmt.Printf("Error writing file: %v\n", err)
 			return
 		}
+		defer os.Remove("docker-compose.yaml")
 
 		multi := pterm.DefaultMultiPrinter
 		launchPb, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("Booting up app on VPS")
 		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
-		setupSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Settin up application")
+		dockerBuildSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Preparing docker image")
+		setupSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up application")
 
 		multi.Start()
 
@@ -103,20 +147,41 @@ to quickly create a Cobra application.`,
 		}
 		launchPb.Increment()
 
+		dockerBuildSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		cwd, _ := os.Getwd()
+		dockerBuildCommd := exec.Command("sh", "-s", "-", appName, viper.Get("dockerUsername").(string), cwd)
+		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
+			panic(dockerBuildErr)
+		}
+		dockerBuildSpinner.Success("Successfully built and pushed docker image")
+		launchPb.Increment()
+
 		setupSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sessionErr := utils.RunCommand(sshClient, "mkdir adonis")
+		sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 		if sessionErr != nil {
 			panic(sessionErr)
 		}
-		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), "./adonis"))
+		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 		rsync.Run()
 
-		sessionErr1 := utils.RunCommand(sshClient, "cd adonis && docker compose -p sidekick up -d")
+		sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker compose -p sidekick up -d", appName))
 		if sessionErr1 != nil {
 			panic(sessionErr1)
 		}
-		setupSpinner.Success("App setup successfully")
+		// save app config in same folder
+		sidekickAppConfig := SidekickAppConfig{
+			Image:          fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
+			Url:            appDomain,
+			CreatedAt:      time.Now().Format(time.UnixDate),
+			LastDeployedAt: time.Now().Format(time.UnixDate),
+		}
+		ymlData, err := yaml.Marshal(&sidekickAppConfig)
+		os.WriteFile("sidekick.yml", ymlData, 0644)
 		launchPb.Increment()
+
+		setupSpinner.Success("App setup successfully")
+
 		multi.Stop()
 	},
 }
