@@ -4,7 +4,9 @@ go 1.22.4
 
 require (
 	github.com/spf13/cobra v1.8.1
+	github.com/spf13/viper v1.19.0
 	golang.org/x/crypto v0.24.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -26,7 +28,6 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/viper v1.19.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.uber.org/atomic v1.9.0 // indirect
@@ -35,7 +36,6 @@ require (
 	golang.org/x/term v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (
