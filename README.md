@@ -1,4 +1,6 @@
 ![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ms-mousa/sidekick)
+![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/ms-mousa/sidekick)
 
 🤜🏼🤛🏼
 Sidekick
