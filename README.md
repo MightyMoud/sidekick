@@ -1,9 +1,11 @@
+# Sidekick
+<div align="center">
+  From bare metal to live side projects in minutes not hours
+  
 ![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ms-mousa/sidekick)
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/ms-mousa/sidekick)
-
-🤜🏼🤛🏼
-Sidekick
+</div>
 
 ## Motivation
 I'm fed up of the complexity required to host my side projects. While some services shine as lamp post in this era of heroku replacmenets, i.e fly.io, I believe simple VPS can go a long way. The motivation behind sidekick is to make hosting your side projects as simple as possible, as cheap as possible and as production ready as possible; you will be surprised how much traffic a 12$/mo instance on DO can handle.
