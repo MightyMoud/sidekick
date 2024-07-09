@@ -32,3 +32,23 @@ Simple CLI tool that can help you:
 - Inject env secrets securely at run-time
 - Deploy preview environments of any application with ease
 - Handle more complex projects built with docker compose
+
+## Demo
+- Normal deployment 
+Empty nextjs project -> run `sidekick launch` -> app live with URL
+- Normal deployment + env file
+Empty nextjs project -> make `sidekick.env.yaml` file with two lists "clear" & "secret" -> run `sidekick env` -> run `sidekick lanuch` -> app live with URL
+- Normal deployment + env file + new version
+Same project -> run `sidekick deploy` -> Zero downtime deployment -> message when deployment is done and app is healthy
+- Normal deployment + env file + preview env 
+Make change into last project in home page -> commit file -> run `sidekick deploy preview` -> preview env live with URL
+
+- Docker compose deployment
+Project with docker compose -> run `sidekick launch` -> app live with URL
+- Docker compose deployment with env file
+Project with docker compose -> make `sidekick.env.yaml` file with two lists "clear" & "secret" -> run `sidekick env` -> run `sidekick launch` -> app live with URL
+
+- Deploy accessory (mysql, pg, redis)
+Project with just docker file -> run `sidekick accessory pg` -> ask couple of questions -> db live with connection string
+
+
