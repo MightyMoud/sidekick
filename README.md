@@ -1,3 +1,4 @@
+![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
 
 🤜🏼🤛🏼
 Sidekick
