@@ -16,7 +16,7 @@ var DockerHandleScript = `
 	dockerUsername=$2
 	projectFolder=$3
 
-	docker build --tag $appName --no-cache --platform linux/amd64 $projectFolder
+	docker build --tag $appName --platform linux/amd64 $projectFolder
 
 	docker tag $appName $dockerUsername/$appName
 
@@ -40,4 +40,9 @@ var PreludeScript = `
 	if [ ! -e "$CONFIG_FILE" ]; then
 	    touch "$CONFIG_FILE"
 	fi
+	`
+
+var EnvEncryptionScript = `
+		PUBKEY=$1
+		sops encrypt --age $PUBKEY .env > encrypted.env
 	`

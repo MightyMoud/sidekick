@@ -8,7 +8,11 @@ var SetupStage = CommandsStage{
 	Commands: []string{
 		"sudo apt-get update -y",
 		"sudo apt-get upgrade -y",
-		"sudo apt-get install ca-certificates curl vim",
+		"sudo apt-get install age -y",
+		"sudo apt-get install ca-certificates curl vim -y",
+		"curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64",
+		"mv sops-v3.9.0.linux.amd64 /usr/local/bin/sops",
+		"sudo chmod +x /usr/local/bin/sops",
 	},
 }
 
@@ -17,8 +21,6 @@ var DockerStage = CommandsStage{
 	SpinnerFailMessage:    "Error happened during setting up docker",
 	Commands: []string{
 		"sudo apt-get update -y",
-		"sudo apt-get install curl -y",
-		"sudo apt-get install ca-certificates -y",
 		"sudo install -m 0755 -d /etc/apt/keyrings",
 		"sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc",
 		"sudo chmod a+r /etc/apt/keyrings/docker.asc",

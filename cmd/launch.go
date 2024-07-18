@@ -35,19 +35,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var launchCmd = &cobra.Command{
+var LaunchCmd = &cobra.Command{
 	Use:   "launch",
 	Short: "Launch a new application to host on your VPS with Sidekick",
 	Long:  `This command will run you through the basic setup to add a new application to your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
-
-		viper.SetConfigName("sidekick")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("$HOME/.config/sidekick/")
-		err := viper.ReadInConfig()
-		if err != nil {
-			panic(fmt.Errorf("fatal error config file: %w", err))
-		}
+		utils.ViperInit()
 
 		keyAddSshCommand := exec.Command("sh", "-s", "-", viper.Get("serverAddress").(string))
 		keyAddSshCommand.Stdin = strings.NewReader(utils.SshKeysScript)
@@ -59,6 +52,7 @@ var launchCmd = &cobra.Command{
 			pterm.Info.Println("Dockerfile detected - scanning file for details")
 		} else {
 			pterm.Error.Println("No dockerfiles found in current directory.")
+			os.Exit(1)
 		}
 		pterm.Info.Println("Analyzing docker file...")
 		res, err := os.ReadFile("./Dockerfile")
@@ -95,6 +89,26 @@ var launchCmd = &cobra.Command{
 		appDomainTextInput.DefaultText = "Please enter the domain to point the app to"
 		appDomain, _ = appDomainTextInput.Show()
 
+		envFileName := ""
+		envFileNameTextInput := pterm.DefaultInteractiveTextInput.WithDefaultValue(".env")
+		envFileNameTextInput.DefaultText = "Please enter which env file you would like to encrypt and use in this deployment"
+		envFileName, _ = envFileNameTextInput.Show()
+
+		// Add a way to change the env file name target
+		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
+			pterm.Info.Println("Env file detected - Loading env vars from .env")
+			_, envFileErr := os.ReadFile("./.env")
+			if envFileErr != nil {
+				pterm.Error.Println("Unable to process your env file")
+			}
+			envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string))
+			envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
+			if envCmdErr := envCmd.Run(); envCmdErr != nil {
+				panic(envCmdErr)
+			}
+		} else {
+			pterm.Info.Println("No env file detected - Skipping env parsing")
+		}
 		// make a docker service
 		imageName := fmt.Sprintf("%s/%s", viper.Get("dockerUsername").(string), appName)
 		newService := DockerService{
@@ -106,6 +120,9 @@ var launchCmd = &cobra.Command{
 				fmt.Sprintf("traefik.http.routers.%s.tls=true", appName),
 				fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=default", appName),
 				"traefik.docker.network=sidekick",
+			},
+			Environment: []string{
+				fmt.Sprintf("%s=${%s}", "PUBLIC_NEXT_DEMO", "PUBLIC_NEXT_DEMO"),
 			},
 			Networks: []string{
 				"sidekick",
@@ -158,14 +175,16 @@ var launchCmd = &cobra.Command{
 		launchPb.Increment()
 
 		setupSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
+		_, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 		if sessionErr != nil {
 			panic(sessionErr)
 		}
 		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 		rsync.Run()
+		encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+		encryptSync.Run()
 
-		sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker compose -p sidekick up -d", appName))
+		_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
 		if sessionErr1 != nil {
 			panic(sessionErr1)
 		}
@@ -177,17 +196,20 @@ var launchCmd = &cobra.Command{
 			LastDeployedAt: time.Now().Format(time.UnixDate),
 		}
 		ymlData, err := yaml.Marshal(&sidekickAppConfig)
-		os.WriteFile("sidekick.yml", ymlData, 0644)
+		os.WriteFile("./sidekick.yml", ymlData, 0644)
 		launchPb.Increment()
 
-		setupSpinner.Success("App setup successfully")
+		pterm.Println()
+		pterm.Info.Printfln("Your application is now live at: %s", appDomain)
+		pterm.Println()
 
+		setupSpinner.Success("App setup successfully")
 		multi.Stop()
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(launchCmd)
+	rootCmd.AddCommand(LaunchCmd)
 
 	// Here you will define your flags and configuration settings.
 

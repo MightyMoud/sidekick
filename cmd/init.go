@@ -115,6 +115,20 @@ var initCmd = &cobra.Command{
 			panic(err)
 		}
 
+		ch, sessionErr := utils.RunCommand(sshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
+		if sessionErr != nil {
+			panic(sessionErr)
+		}
+
+		select {
+		case output := <-ch:
+			if strings.HasPrefix(output, "Public key") {
+				publicKey := strings.Split(output, " ")[2:3]
+				viper.Set("publicKey", publicKey[0])
+				viper.WriteConfig()
+			}
+		}
+
 		if err := utils.RunStage(sshClient, utils.DockerStage, stage2Spinner, setupProgressBar); err != nil {
 			panic(err)
 		}

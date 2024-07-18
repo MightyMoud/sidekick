@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pterm/pterm"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -68,9 +69,10 @@ func GetSshClient(server string) (*ssh.Client, error) {
 	return client, nil
 }
 
-func RunCommand(client *ssh.Client, cmd string) error {
+func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
 	session, err := client.NewSession()
 	errChannel := make(chan string)
+	stdOutChannel := make(chan string)
 	if err != nil {
 		log.Fatalf("Failed to create session: %s", err)
 	}
@@ -78,11 +80,11 @@ func RunCommand(client *ssh.Client, cmd string) error {
 	// Need to hook into the pipe of output coming from that session
 	stdoutReader, err := session.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("error getting stdout reader: %s", err)
+		return nil, fmt.Errorf("error getting stdout reader: %s", err)
 	}
 	stderrReader, err := session.StderrPipe()
 	if err != nil {
-		return fmt.Errorf("error getting stderr reader: %s", err)
+		return nil, fmt.Errorf("error getting stderr reader: %s", err)
 	}
 
 	// make a scanner of that reader that will read as we get new stuff
@@ -92,6 +94,7 @@ func RunCommand(client *ssh.Client, cmd string) error {
 	// start separate go routines to read from the pipes and print out
 	go func() {
 		for stdoutScanner.Scan() {
+			stdOutChannel <- stdoutScanner.Text()
 			// fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
 		}
 	}()
@@ -107,16 +110,17 @@ func RunCommand(client *ssh.Client, cmd string) error {
 	if err := session.Run(cmd); err != nil {
 		session.Close()
 		errString := <-errChannel
-		return fmt.Errorf("error running command - %s: - %s", cmd, errString)
+		return nil, fmt.Errorf("error running command - %s: - %s", cmd, errString)
 	}
+
 	time.Sleep(time.Millisecond * 500)
 	// fmt.Println("Ran command successfully!")
-	return nil
+	return stdOutChannel, nil
 }
 
 func RunCommands(client *ssh.Client, commands []string) error {
 	for _, cmd := range commands {
-		err := RunCommand(client, cmd)
+		_, err := RunCommand(client, cmd)
 		if err != nil {
 			return err
 		}
@@ -170,4 +174,14 @@ func FileExists(filename string) bool {
 		return false
 	}
 	return false
+}
+
+func ViperInit() {
+	viper.SetConfigName("sidekick")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("$HOME/.config/sidekick/")
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
 }
