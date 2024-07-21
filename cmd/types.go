@@ -20,8 +20,15 @@ type DockerComposeFile struct {
 }
 
 type SidekickAppConfig struct {
-	Image          string `yaml:"image"`
-	Url            string `yaml:"url"`
-	CreatedAt      string `yaml:"createdAt"`
-	LastDeployedAt string `yaml:"lastDeployedAt"`
+	Name      string `yaml:"name"`
+	Version   string `yaml:"version"`
+	Image     string `yaml:"image"`
+	Url       string `yaml:"url"`
+	Port      string `yaml:"port"`
+	EnvFile   string `yaml:"envFile"`
+	CreatedAt string `yaml:"createdAt"`
+}
+
+type SidekickPorjectConfigFile struct {
+	App SidekickAppConfig `yaml:"app"`
 }

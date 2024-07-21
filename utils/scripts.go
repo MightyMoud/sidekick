@@ -43,6 +43,21 @@ var PreludeScript = `
 	`
 
 var EnvEncryptionScript = `
-		PUBKEY=$1
-		sops encrypt --age $PUBKEY .env > encrypted.env
+	PUBKEY=$1
+	ENVFILE=$2
+
+	sops encrypt --age $PUBKEY $ENVFILE > encrypted.env
+	`
+
+var DeployScriptString = `
+	cd $service_name && \
+	old_container_id=$(docker ps -f name=$service_name -q | tail -n1) && \
+	docker pull $docker_username/$service_name && \
+	docker compose -p sidekick up -d --no-deps --scale $service_name=2 --no-recreate $service_name && \
+	new_container_id=$(docker ps -f name=$service_name -q | head -n1) && \
+	new_container_ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $new_container_id) && \
+	curl --silent --include --retry-connrefused --retry 30 --retry-delay 1 --fail http://$new_container_ip:$app_port/ || exit 1 && \
+	docker stop $old_container_id && \
+	docker rm $old_container_id && \
+	sops exec-env encrypted.env 'docker compose -p sidekick up -d --no-deps --scale $service_name=1 --no-recreate $service_name'
 	`

@@ -14,6 +14,9 @@ From bare metal to live side projects in minutes not hours
 
 </div>
 
+## Features
+
+
 ## Motivation
 
 I'm fed up of the complexity required to host my side projects. While some services shine as lamp post in this era of heroku replacmenets, i.e fly.io, I believe simple VPS can go a long way. The motivation behind sidekick is to make hosting your side projects as simple as possible, as cheap as possible and as production ready as possible; you will be surprised how much traffic a 12$/mo instance on DO can handle.

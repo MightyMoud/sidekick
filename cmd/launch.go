@@ -35,12 +35,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var LaunchCmd = &cobra.Command{
+var launchCmd = &cobra.Command{
 	Use:   "launch",
 	Short: "Launch a new application to host on your VPS with Sidekick",
 	Long:  `This command will run you through the basic setup to add a new application to your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		utils.ViperInit()
+		if configErr := utils.ViperInit(); configErr != nil {
+			pterm.Error.Println("Sidekick config not found - Run sidekick init")
+			os.Exit(1)
+		}
 
 		keyAddSshCommand := exec.Command("sh", "-s", "-", viper.Get("serverAddress").(string))
 		keyAddSshCommand.Stdin = strings.NewReader(utils.SshKeysScript)
@@ -91,18 +94,32 @@ var LaunchCmd = &cobra.Command{
 
 		envFileName := ""
 		envFileNameTextInput := pterm.DefaultInteractiveTextInput.WithDefaultValue(".env")
-		envFileNameTextInput.DefaultText = "Please enter which env file you would like to encrypt and use in this deployment"
+		envFileNameTextInput.DefaultText = "Please enter which env file you would like to load"
 		envFileName, _ = envFileNameTextInput.Show()
 
 		// Add a way to change the env file name target
+		envVariables := []string{}
+		dockerEnvProperty := []string{}
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
-			pterm.Info.Println("Env file detected - Loading env vars from .env")
-			_, envFileErr := os.ReadFile("./.env")
+			pterm.Info.Printfln("Env file detected - Loading env vars from %s", envFileName)
+			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", envFileName))
 			if envFileErr != nil {
 				pterm.Error.Println("Unable to process your env file")
 			}
-			envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string))
+			for _, line := range strings.Split(string(envFileContent), "\n") {
+				if len(line) == 0 || strings.HasPrefix(line, "#") {
+					continue
+				}
+				envVariables = append(envVariables, strings.Split(line, "=")[0])
+			}
+
+			for _, envVar := range envVariables {
+				dockerEnvProperty = append(dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
+			}
+
+			envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", envFileName))
 			envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
+			envCmd.Stderr = os.Stderr
 			if envCmdErr := envCmd.Run(); envCmdErr != nil {
 				panic(envCmdErr)
 			}
@@ -121,9 +138,7 @@ var LaunchCmd = &cobra.Command{
 				fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=default", appName),
 				"traefik.docker.network=sidekick",
 			},
-			Environment: []string{
-				fmt.Sprintf("%s=${%s}", "PUBLIC_NEXT_DEMO", "PUBLIC_NEXT_DEMO"),
-			},
+			Environment: dockerEnvProperty,
 			Networks: []string{
 				"sidekick",
 			},
@@ -189,27 +204,33 @@ var LaunchCmd = &cobra.Command{
 			panic(sessionErr1)
 		}
 		// save app config in same folder
-		sidekickAppConfig := SidekickAppConfig{
-			Image:          fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
-			Url:            appDomain,
-			CreatedAt:      time.Now().Format(time.UnixDate),
-			LastDeployedAt: time.Now().Format(time.UnixDate),
+		sidekickAppConfig := SidekickPorjectConfigFile{
+			App: SidekickAppConfig{
+				Name:      appName,
+				Version:   "V1",
+				Image:     fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
+				Port:      appPort,
+				Url:       appDomain,
+				EnvFile:   envFileName,
+				CreatedAt: time.Now().Format(time.UnixDate),
+			},
 		}
 		ymlData, err := yaml.Marshal(&sidekickAppConfig)
 		os.WriteFile("./sidekick.yml", ymlData, 0644)
 		launchPb.Increment()
 
+		setupSpinner.Success("🙌 App setup successfully 🙌")
+		multi.Stop()
+
 		pterm.Println()
-		pterm.Info.Printfln("Your application is now live at: %s", appDomain)
+		pterm.Info.Printfln("😎 Access your app at: https://%s", appDomain)
 		pterm.Println()
 
-		setupSpinner.Success("App setup successfully")
-		multi.Stop()
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(LaunchCmd)
+	rootCmd.AddCommand(launchCmd)
 
 	// Here you will define your flags and configuration settings.
 

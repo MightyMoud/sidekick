@@ -1,0 +1,125 @@
+/*
+Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/ms-mousa/sidekick/utils"
+	"github.com/pterm/pterm"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
+)
+
+// deployCmd represents the deploy command
+var deployCmd = &cobra.Command{
+	Use:   "deploy",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if configErr := utils.ViperInit(); configErr != nil {
+			pterm.Error.Println("Sidekick config not found - Run sidekick init")
+			os.Exit(1)
+		}
+		if !utils.FileExists("./sidekick.yml") {
+			pterm.Error.Println(`Sidekick config not found in current directory 
+Run sidekick launch`)
+			os.Exit(1)
+		}
+
+		multi := pterm.DefaultMultiPrinter
+		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
+		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
+		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
+		// check env hash if it has changed or not -> if it did, re-encrypt the file, send it over and then move on
+		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a new version of your application")
+
+		multi.Start()
+
+		projectConfig := SidekickPorjectConfigFile{}
+		content, err := os.ReadFile("./sidekick.yml")
+		if err != nil {
+			fmt.Println(err)
+			pterm.Error.Println("Unable to process your project config")
+			os.Exit(1)
+		}
+		if err := yaml.Unmarshal(content, &projectConfig); err != nil {
+			panic(err)
+		}
+
+		replacer := strings.NewReplacer(
+			"$service_name", projectConfig.App.Name,
+			"$app_port", projectConfig.App.Port,
+			"$docker_username", viper.Get("dockerUsername").(string),
+		)
+
+		sshClient, err := utils.LoginStage(viper.Get("serverAddress").(string), loginSpinner, setupProgressBar)
+		if err != nil {
+			panic(err)
+		}
+
+		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		cwd, _ := os.Getwd()
+		dockerBuildCommd := exec.Command("sh", "-s", "-", projectConfig.App.Name, viper.Get("dockerUsername").(string), cwd)
+		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
+			panic(dockerBuildErr)
+		}
+		dockerBuildStageSpinner.Success("Latest docker image build")
+
+		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		deployScript := replacer.Replace(utils.DeployScriptString)
+		_, sessionErr := utils.RunCommand(sshClient, deployScript)
+		if sessionErr != nil {
+			panic(sessionErr)
+		}
+		deployStageSpinner.Success("🙌 Deployed new version successfully 🙌")
+		multi.Stop()
+
+		pterm.Println()
+		pterm.Info.Printfln("😎 View your app at: https://%s", projectConfig.App.Url)
+		pterm.Println()
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(deployCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// deployCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// deployCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}

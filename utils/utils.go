@@ -176,12 +176,13 @@ func FileExists(filename string) bool {
 	return false
 }
 
-func ViperInit() {
+func ViperInit() error {
 	viper.SetConfigName("sidekick")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/.config/sidekick/")
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Errorf("fatal error config file: %w", err))
+		return fmt.Errorf("Fatal error config file: %w", err)
 	}
+	return nil
 }
