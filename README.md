@@ -15,25 +15,24 @@ From bare metal to live side projects in minutes not hours
 </div>
 
 ## Features
-
+- 👍 One command VPS setup (docker, traefik, sops, age)
+- 💻 deploy any application from a dockerfile
+- ✊ Zero downtime deployment
+- 🔒 Zero config TLS Certs
+- ✅ Connect domains or use sslip.io out of the box
+- 🔥 Built in integration with SOPS
+- 🚀 Single command preview deployments
+- 🛸 Escape the vendorlock forever
 
 ## Motivation
-
 I'm fed up of the complexity required to host my side projects. While some services shine as lamp post in this era of heroku replacmenets, i.e fly.io, I believe simple VPS can go a long way. The motivation behind sidekick is to make hosting your side projects as simple as possible, as cheap as possible and as production ready as possible; you will be surprised how much traffic a 12$/mo instance on DO can handle.
 
-# Sidekick
-
-From baremetal to live side projects in minutes not hours and for the price of a couple of coffees a month
-
 ## Inspiration
-
-- Fly.io
-- Kamal.dev
+- https://fly.io/
+- https://kamal-deploy.org/
 
 ## Vision
-
 Simple CLI tool that can help you:
-
 - Setup your VPS
 - Deploy all your side projects on a single VPS
 - Load balance multiple container per project
@@ -42,21 +41,14 @@ Simple CLI tool that can help you:
 - Manage env secrets in a secure way
 - Connect any number of domains and subdomains to your projects with ease
 
-## Features
-
-- Deploy any application from a dockerfile
-- Connect any domain to any of your side projects hosted on your VPS
-- Automatic HTTPS and TLS certs for all your projects
 
 ## Roadmap
-
 - Zero downtime deployments
 - Inject env secrets securely at run-time
 - Deploy preview environments of any application with ease
 - Handle more complex projects built with docker compose
 
 ## Demo
-
 - Normal deployment
   Empty nextjs project -> run `sidekick launch` -> app live with URL
 - Normal deployment + env file
