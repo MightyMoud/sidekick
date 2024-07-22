@@ -19,14 +19,19 @@ type DockerComposeFile struct {
 	Networks map[string]DockerNetwork `yaml:"networks"`
 }
 
+type SidekickAppEnvConfig struct {
+	File string `yaml:"file"`
+	Hash string `yaml:"hash"`
+}
+
 type SidekickAppConfig struct {
-	Name      string `yaml:"name"`
-	Version   string `yaml:"version"`
-	Image     string `yaml:"image"`
-	Url       string `yaml:"url"`
-	Port      string `yaml:"port"`
-	EnvFile   string `yaml:"envFile"`
-	CreatedAt string `yaml:"createdAt"`
+	Name      string               `yaml:"name"`
+	Version   string               `yaml:"version"`
+	Image     string               `yaml:"image"`
+	Url       string               `yaml:"url"`
+	Port      uint64               `yaml:"port"`
+	CreatedAt string               `yaml:"createdAt"`
+	Env       SidekickAppEnvConfig `yaml:"env,omitempty"`
 }
 
 type SidekickPorjectConfigFile struct {

@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"crypto/md5"
 	"fmt"
 	"os"
 	"os/exec"
@@ -77,7 +78,7 @@ Run sidekick launch`)
 
 		replacer := strings.NewReplacer(
 			"$service_name", projectConfig.App.Name,
-			"$app_port", projectConfig.App.Port,
+			"$app_port", fmt.Sprint(projectConfig.App.Port),
 			"$docker_username", viper.Get("dockerUsername").(string),
 		)
 
@@ -87,25 +88,54 @@ Run sidekick launch`)
 		}
 
 		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		if projectConfig.App.Env.File != "" {
+			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", projectConfig.App.Env.File))
+			if envFileErr != nil {
+				pterm.Error.Println("Unable to process your env file")
+				os.Exit(1)
+			}
+			currentHash := fmt.Sprintf("%x", md5.Sum(envFileContent))
+			if projectConfig.App.Env.Hash != currentHash {
+				// encrypt new env file
+				envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", projectConfig.App.Env.File))
+				envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
+				if envCmdErr := envCmd.Run(); envCmdErr != nil {
+					panic(envCmdErr)
+				}
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", projectConfig.App.Name)))
+				encryptSync.Run()
+			}
+		}
+
 		cwd, _ := os.Getwd()
 		dockerBuildCommd := exec.Command("sh", "-s", "-", projectConfig.App.Name, viper.Get("dockerUsername").(string), cwd)
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			panic(dockerBuildErr)
 		}
-		dockerBuildStageSpinner.Success("Latest docker image build")
+		dockerBuildStageSpinner.Success("Latest docker image built")
 
 		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		deployScript := replacer.Replace(utils.DeployScriptString)
-		_, sessionErr := utils.RunCommand(sshClient, deployScript)
-		if sessionErr != nil {
-			panic(sessionErr)
+		if projectConfig.App.Env.File != "" {
+			deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
+			_, sessionErr := utils.RunCommand(sshClient, deployScript)
+			if sessionErr != nil {
+				panic(sessionErr)
+			}
+		} else {
+			deployScript := replacer.Replace(utils.DeployAppScript)
+			_, sessionErr := utils.RunCommand(sshClient, deployScript)
+			if sessionErr != nil {
+				panic(sessionErr)
+			}
 		}
+
 		deployStageSpinner.Success("🙌 Deployed new version successfully 🙌")
 		multi.Stop()
 
 		pterm.Println()
 		pterm.Info.Printfln("😎 View your app at: https://%s", projectConfig.App.Url)
+
 		pterm.Println()
 	},
 }

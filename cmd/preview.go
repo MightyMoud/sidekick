@@ -41,7 +41,7 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		replacer := strings.NewReplacer("$service_name", "mahmoud")
-		command := replacer.Replace(utils.DeployScriptString)
+		command := replacer.Replace(utils.DeployAppScript)
 		fmt.Println(command)
 	},
 }

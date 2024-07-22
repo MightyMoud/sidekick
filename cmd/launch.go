@@ -22,9 +22,11 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"crypto/md5"
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -97,10 +99,12 @@ var launchCmd = &cobra.Command{
 		envFileNameTextInput.DefaultText = "Please enter which env file you would like to load"
 		envFileName, _ = envFileNameTextInput.Show()
 
-		// Add a way to change the env file name target
+		hasEnvFile := false
 		envVariables := []string{}
 		dockerEnvProperty := []string{}
+		envFileChecksum := ""
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
+			hasEnvFile = true
 			pterm.Info.Printfln("Env file detected - Loading env vars from %s", envFileName)
 			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", envFileName))
 			if envFileErr != nil {
@@ -116,10 +120,10 @@ var launchCmd = &cobra.Command{
 			for _, envVar := range envVariables {
 				dockerEnvProperty = append(dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
 			}
-
+			// calculate and store the hash of env file to re-encrypt later on when changed
+			envFileChecksum = fmt.Sprintf("%x", md5.Sum(envFileContent))
 			envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", envFileName))
 			envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
-			envCmd.Stderr = os.Stderr
 			if envCmdErr := envCmd.Run(); envCmdErr != nil {
 				panic(envCmdErr)
 			}
@@ -196,12 +200,29 @@ var launchCmd = &cobra.Command{
 		}
 		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 		rsync.Run()
-		encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
-		encryptSync.Run()
+		if hasEnvFile {
+			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+			encryptSync.Run()
 
-		_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
-		if sessionErr1 != nil {
-			panic(sessionErr1)
+			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
+			if sessionErr1 != nil {
+				panic(sessionErr1)
+			}
+		} else {
+			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
+			if sessionErr1 != nil {
+				panic(sessionErr1)
+			}
+		}
+
+		portNumber, err := strconv.ParseUint(appPort, 0, 64)
+		if err != nil {
+			panic(err)
+		}
+		envConfig := SidekickAppEnvConfig{}
+		if hasEnvFile {
+			envConfig.File = envFileName
+			envConfig.Hash = envFileChecksum
 		}
 		// save app config in same folder
 		sidekickAppConfig := SidekickPorjectConfigFile{
@@ -209,10 +230,10 @@ var launchCmd = &cobra.Command{
 				Name:      appName,
 				Version:   "V1",
 				Image:     fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
-				Port:      appPort,
+				Port:      portNumber,
 				Url:       appDomain,
-				EnvFile:   envFileName,
 				CreatedAt: time.Now().Format(time.UnixDate),
+				Env:       envConfig,
 			},
 		}
 		ymlData, err := yaml.Marshal(&sidekickAppConfig)
