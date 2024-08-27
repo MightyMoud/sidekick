@@ -1,4 +1,4 @@
-package cmd
+package utils
 
 type DockerService struct {
 	Image       string   `yaml:"image"`
@@ -34,6 +34,6 @@ type SidekickAppConfig struct {
 	Env       SidekickAppEnvConfig `yaml:"env,omitempty"`
 }
 
-type SidekickPorjectConfigFile struct {
+type SidekickAppConfigFile struct {
 	App SidekickAppConfig `yaml:"app"`
 }

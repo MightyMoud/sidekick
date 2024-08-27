@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/ms-mousa/sidekick/utils"
@@ -65,20 +66,13 @@ Run sidekick launch`)
 
 		multi.Start()
 
-		projectConfig := SidekickPorjectConfigFile{}
-		content, err := os.ReadFile("./sidekick.yml")
-		if err != nil {
-			fmt.Println(err)
-			pterm.Error.Println("Unable to process your project config")
-			os.Exit(1)
+		appConfigFile, loadError := utils.LoadAppConfig()
+		if loadError != nil {
+			panic(loadError)
 		}
-		if err := yaml.Unmarshal(content, &projectConfig); err != nil {
-			panic(err)
-		}
-
 		replacer := strings.NewReplacer(
-			"$service_name", projectConfig.App.Name,
-			"$app_port", fmt.Sprint(projectConfig.App.Port),
+			"$service_name", appConfigFile.App.Name,
+			"$app_port", fmt.Sprint(appConfigFile.App.Port),
 			"$docker_username", viper.Get("dockerUsername").(string),
 		)
 
@@ -88,27 +82,32 @@ Run sidekick launch`)
 		}
 
 		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		if projectConfig.App.Env.File != "" {
-			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", projectConfig.App.Env.File))
+		envFileChanged := false
+		currentEnvFileHash := ""
+		if appConfigFile.App.Env.File != "" {
+			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", appConfigFile.App.Env.File))
 			if envFileErr != nil {
 				pterm.Error.Println("Unable to process your env file")
 				os.Exit(1)
 			}
-			currentHash := fmt.Sprintf("%x", md5.Sum(envFileContent))
-			if projectConfig.App.Env.Hash != currentHash {
+			currentEnvFileHash = fmt.Sprintf("%x", md5.Sum(envFileContent))
+			envFileChanged = appConfigFile.App.Env.Hash != currentEnvFileHash
+			if envFileChanged {
 				// encrypt new env file
-				envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", projectConfig.App.Env.File))
+				envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", appConfigFile.App.Env.File))
 				envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
+				envCmd.Stdout = os.Stdout
+				envCmd.Stderr = os.Stderr
 				if envCmdErr := envCmd.Run(); envCmdErr != nil {
 					panic(envCmdErr)
 				}
-				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", projectConfig.App.Name)))
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfigFile.App.Name)))
 				encryptSync.Run()
 			}
 		}
 
 		cwd, _ := os.Getwd()
-		dockerBuildCommd := exec.Command("sh", "-s", "-", projectConfig.App.Name, viper.Get("dockerUsername").(string), cwd)
+		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfigFile.App.Name, viper.Get("dockerUsername").(string), cwd)
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			panic(dockerBuildErr)
@@ -116,7 +115,7 @@ Run sidekick launch`)
 		dockerBuildStageSpinner.Success("Latest docker image built")
 
 		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		if projectConfig.App.Env.File != "" {
+		if appConfigFile.App.Env.File != "" {
 			deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
 			_, sessionErr := utils.RunCommand(sshClient, deployScript)
 			if sessionErr != nil {
@@ -130,11 +129,20 @@ Run sidekick launch`)
 			}
 		}
 
+		latestVersion := strings.Split(appConfigFile.App.Version, "")[1]
+		latestVersionInt, _ := strconv.ParseInt(latestVersion, 0, 64)
+		appConfigFile.App.Version = fmt.Sprintf("V%d", latestVersionInt+1)
+		// env file changed ? -> update hash
+		if envFileChanged {
+			appConfigFile.App.Env.Hash = currentEnvFileHash
+		}
+		ymlData, err := yaml.Marshal(&appConfigFile)
+		os.WriteFile("./sidekick.yml", ymlData, 0644)
 		deployStageSpinner.Success("🙌 Deployed new version successfully 🙌")
 		multi.Stop()
 
 		pterm.Println()
-		pterm.Info.Printfln("😎 View your app at: https://%s", projectConfig.App.Url)
+		pterm.Info.Printfln("😎 View your app at: https://%s", appConfigFile.App.Url)
 
 		pterm.Println()
 	},

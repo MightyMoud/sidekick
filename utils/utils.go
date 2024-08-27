@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"gopkg.in/yaml.v3"
 )
 
 type CommandsStage struct {
@@ -95,14 +96,14 @@ func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
 	go func() {
 		for stdoutScanner.Scan() {
 			stdOutChannel <- stdoutScanner.Text()
-			// fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
+			fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
 		}
 	}()
 
 	go func() {
 		for stderrScanner.Scan() {
 			errChannel <- stderrScanner.Text()
-			// fmt.Printf("\n\033[31m[STDERR]\033[0m %s\n", stderrScanner.Text())
+			fmt.Printf("\n\033[31m[STDERR]\033[0m %s\n", stderrScanner.Text())
 		}
 	}()
 
@@ -185,4 +186,23 @@ func ViperInit() error {
 		return fmt.Errorf("Fatal error config file: %w", err)
 	}
 	return nil
+}
+
+func LoadAppConfig() (SidekickAppConfigFile, error) {
+	if !FileExists("./sidekick.yml") {
+		log.Fatalln("Sidekick app config not found. Please run sidekick init first")
+		os.Exit(1)
+	}
+	appConfigFile := SidekickAppConfigFile{}
+	content, err := os.ReadFile("./sidekick.yml")
+	if err != nil {
+		fmt.Println(err)
+		pterm.Error.Println("Unable to process your project config")
+		os.Exit(1)
+	}
+	if err := yaml.Unmarshal(content, &appConfigFile); err != nil {
+		panic(err)
+	}
+
+	return appConfigFile, nil
 }

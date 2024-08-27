@@ -23,9 +23,13 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/ms-mousa/sidekick/utils"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -40,9 +44,33 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		replacer := strings.NewReplacer("$service_name", "mahmoud")
-		command := replacer.Replace(utils.DeployAppScript)
-		fmt.Println(command)
+		utils.ViperInit()
+		appConfig, appConfigErr := utils.LoadAppConfig()
+		if appConfigErr != nil {
+			log.Fatalln("Unable to load your config file. Might be corrupted")
+			os.Exit(1)
+		}
+		fmt.Println(appConfig)
+		gitTreeCheck := exec.Command("sh", "-s", "-")
+		gitTreeCheck.Stdin = strings.NewReader(utils.CheckGitTreeScript)
+		output, _ := gitTreeCheck.Output()
+		if string(output) != "all good\n" {
+			fmt.Println(string(output))
+			pterm.Error.Println("Please commit any changes to git before deploying a preview environment")
+			os.Exit(1)
+		}
+
+		gitShortHashCmd := exec.Command("sh", "-s", "-")
+		gitShortHashCmd.Stdin = strings.NewReader("git rev-parse --short HEAD")
+		hashOutput, hashErr := gitShortHashCmd.Output()
+		if hashErr != nil {
+			panic(hashErr)
+		}
+		fmt.Println(string(hashOutput))
+		// if dockerBuildErr := gitTreeCheck.Run(); dockerBuildErr != nil {
+		// 	log.Fatalln("Failed to run docker")
+		// 	os.Exit(1)
+		// }
 	},
 }
 

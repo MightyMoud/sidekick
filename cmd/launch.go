@@ -24,6 +24,7 @@ package cmd
 import (
 	"crypto/md5"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -132,7 +133,7 @@ var launchCmd = &cobra.Command{
 		}
 		// make a docker service
 		imageName := fmt.Sprintf("%s/%s", viper.Get("dockerUsername").(string), appName)
-		newService := DockerService{
+		newService := utils.DockerService{
 			Image: imageName,
 			Labels: []string{
 				"traefik.enable=true",
@@ -147,11 +148,11 @@ var launchCmd = &cobra.Command{
 				"sidekick",
 			},
 		}
-		newDockerCompose := DockerComposeFile{
-			Services: map[string]DockerService{
+		newDockerCompose := utils.DockerComposeFile{
+			Services: map[string]utils.DockerService{
 				appName: newService,
 			},
-			Networks: map[string]DockerNetwork{
+			Networks: map[string]utils.DockerNetwork{
 				"sidekick": {
 					External: true,
 				},
@@ -187,8 +188,10 @@ var launchCmd = &cobra.Command{
 		cwd, _ := os.Getwd()
 		dockerBuildCommd := exec.Command("sh", "-s", "-", appName, viper.Get("dockerUsername").(string), cwd)
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		// better handle of errors -> Push it to another writer aside from os.stderr and then flush it when it panics
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
-			panic(dockerBuildErr)
+			log.Fatalln("Failed to run docker")
+			os.Exit(1)
 		}
 		dockerBuildSpinner.Success("Successfully built and pushed docker image")
 		launchPb.Increment()
@@ -219,14 +222,14 @@ var launchCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
-		envConfig := SidekickAppEnvConfig{}
+		envConfig := utils.SidekickAppEnvConfig{}
 		if hasEnvFile {
 			envConfig.File = envFileName
 			envConfig.Hash = envFileChecksum
 		}
 		// save app config in same folder
-		sidekickAppConfig := SidekickPorjectConfigFile{
-			App: SidekickAppConfig{
+		sidekickAppConfig := utils.SidekickAppConfigFile{
+			App: utils.SidekickAppConfig{
 				Name:      appName,
 				Version:   "V1",
 				Image:     fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
