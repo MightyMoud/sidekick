@@ -61,18 +61,17 @@ Run sidekick launch`)
 		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
 		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
 		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
-		// check env hash if it has changed or not -> if it did, re-encrypt the file, send it over and then move on
 		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a new version of your application")
 
 		multi.Start()
 
-		appConfigFile, loadError := utils.LoadAppConfig()
+		appConfig, loadError := utils.LoadAppConfig()
 		if loadError != nil {
 			panic(loadError)
 		}
 		replacer := strings.NewReplacer(
-			"$service_name", appConfigFile.App.Name,
-			"$app_port", fmt.Sprint(appConfigFile.App.Port),
+			"$service_name", appConfig.Name,
+			"$app_port", fmt.Sprint(appConfig.Port),
 			"$docker_username", viper.Get("dockerUsername").(string),
 		)
 
@@ -84,30 +83,30 @@ Run sidekick launch`)
 		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		envFileChanged := false
 		currentEnvFileHash := ""
-		if appConfigFile.App.Env.File != "" {
-			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", appConfigFile.App.Env.File))
+		if appConfig.Env.File != "" {
+			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", appConfig.Env.File))
 			if envFileErr != nil {
 				pterm.Error.Println("Unable to process your env file")
 				os.Exit(1)
 			}
 			currentEnvFileHash = fmt.Sprintf("%x", md5.Sum(envFileContent))
-			envFileChanged = appConfigFile.App.Env.Hash != currentEnvFileHash
+			envFileChanged = appConfig.Env.Hash != currentEnvFileHash
 			if envFileChanged {
 				// encrypt new env file
-				envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", appConfigFile.App.Env.File))
+				envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", appConfig.Env.File))
 				envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
 				envCmd.Stdout = os.Stdout
 				envCmd.Stderr = os.Stderr
 				if envCmdErr := envCmd.Run(); envCmdErr != nil {
 					panic(envCmdErr)
 				}
-				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfigFile.App.Name)))
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfig.Name)))
 				encryptSync.Run()
 			}
 		}
 
 		cwd, _ := os.Getwd()
-		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfigFile.App.Name, viper.Get("dockerUsername").(string), cwd)
+		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, viper.Get("dockerUsername").(string), cwd, "latest")
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			panic(dockerBuildErr)
@@ -115,7 +114,7 @@ Run sidekick launch`)
 		dockerBuildStageSpinner.Success("Latest docker image built")
 
 		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		if appConfigFile.App.Env.File != "" {
+		if appConfig.Env.File != "" {
 			deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
 			_, sessionErr := utils.RunCommand(sshClient, deployScript)
 			if sessionErr != nil {
@@ -129,20 +128,20 @@ Run sidekick launch`)
 			}
 		}
 
-		latestVersion := strings.Split(appConfigFile.App.Version, "")[1]
+		latestVersion := strings.Split(appConfig.Version, "")[1]
 		latestVersionInt, _ := strconv.ParseInt(latestVersion, 0, 64)
-		appConfigFile.App.Version = fmt.Sprintf("V%d", latestVersionInt+1)
+		appConfig.Version = fmt.Sprintf("V%d", latestVersionInt+1)
 		// env file changed ? -> update hash
 		if envFileChanged {
-			appConfigFile.App.Env.Hash = currentEnvFileHash
+			appConfig.Env.Hash = currentEnvFileHash
 		}
-		ymlData, err := yaml.Marshal(&appConfigFile)
+		ymlData, err := yaml.Marshal(&appConfig)
 		os.WriteFile("./sidekick.yml", ymlData, 0644)
 		deployStageSpinner.Success("🙌 Deployed new version successfully 🙌")
 		multi.Stop()
 
 		pterm.Println()
-		pterm.Info.Printfln("😎 View your app at: https://%s", appConfigFile.App.Url)
+		pterm.Info.Printfln("😎 View your app at: https://%s", appConfig.Url)
 
 		pterm.Println()
 	},

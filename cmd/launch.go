@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"crypto/md5"
 	"fmt"
 	"log"
 	"os"
@@ -107,27 +106,8 @@ var launchCmd = &cobra.Command{
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
 			hasEnvFile = true
 			pterm.Info.Printfln("Env file detected - Loading env vars from %s", envFileName)
-			envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", envFileName))
-			if envFileErr != nil {
-				pterm.Error.Println("Unable to process your env file")
-			}
-			for _, line := range strings.Split(string(envFileContent), "\n") {
-				if len(line) == 0 || strings.HasPrefix(line, "#") {
-					continue
-				}
-				envVariables = append(envVariables, strings.Split(line, "=")[0])
-			}
-
-			for _, envVar := range envVariables {
-				dockerEnvProperty = append(dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
-			}
-			// calculate and store the hash of env file to re-encrypt later on when changed
-			envFileChecksum = fmt.Sprintf("%x", md5.Sum(envFileContent))
-			envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", envFileName))
-			envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
-			if envCmdErr := envCmd.Run(); envCmdErr != nil {
-				panic(envCmdErr)
-			}
+			utils.HandleEnvFile(envFileName, envVariables, dockerEnvProperty, &envFileChecksum)
+			defer os.Remove("encrypted.env")
 		} else {
 			pterm.Info.Println("No env file detected - Skipping env parsing")
 		}
@@ -228,16 +208,14 @@ var launchCmd = &cobra.Command{
 			envConfig.Hash = envFileChecksum
 		}
 		// save app config in same folder
-		sidekickAppConfig := utils.SidekickAppConfigFile{
-			App: utils.SidekickAppConfig{
-				Name:      appName,
-				Version:   "V1",
-				Image:     fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
-				Port:      portNumber,
-				Url:       appDomain,
-				CreatedAt: time.Now().Format(time.UnixDate),
-				Env:       envConfig,
-			},
+		sidekickAppConfig := utils.SidekickAppConfig{
+			Name:      appName,
+			Version:   "V1",
+			Image:     fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
+			Port:      portNumber,
+			Url:       appDomain,
+			CreatedAt: time.Now().Format(time.UnixDate),
+			Env:       envConfig,
 		}
 		ymlData, err := yaml.Marshal(&sidekickAppConfig)
 		os.WriteFile("./sidekick.yml", ymlData, 0644)

@@ -24,16 +24,19 @@ type SidekickAppEnvConfig struct {
 	Hash string `yaml:"hash"`
 }
 
-type SidekickAppConfig struct {
-	Name      string               `yaml:"name"`
-	Version   string               `yaml:"version"`
-	Image     string               `yaml:"image"`
-	Url       string               `yaml:"url"`
-	Port      uint64               `yaml:"port"`
-	CreatedAt string               `yaml:"createdAt"`
-	Env       SidekickAppEnvConfig `yaml:"env,omitempty"`
+type SidekickPreview struct {
+	Name  string `yaml:"name"`
+	Url   string `yaml:"url"`
+	Image string `yaml:"image"`
 }
 
-type SidekickAppConfigFile struct {
-	App SidekickAppConfig `yaml:"app"`
+type SidekickAppConfig struct {
+	Name        string                     `yaml:"name"`
+	Version     string                     `yaml:"version"`
+	Image       string                     `yaml:"image"`
+	Url         string                     `yaml:"url"`
+	Port        uint64                     `yaml:"port"`
+	CreatedAt   string                     `yaml:"createdAt"`
+	Env         SidekickAppEnvConfig       `yaml:"env,omitempty"`
+	PreviewEnvs map[string]SidekickPreview `yaml:"previewEnvs"`
 }

@@ -15,12 +15,13 @@ var DockerHandleScript = `
 	appName=$1
 	dockerUsername=$2
 	projectFolder=$3
+	tag=${4:-"latest"}
 
 	docker build --tag $appName --platform linux/amd64 $projectFolder
 
-	docker tag $appName $dockerUsername/$appName
+	docker tag $appName $dockerUsername/$appName:$tag
 
-	docker push $dockerUsername/$appName
+	docker push $dockerUsername/$appName:$tag
 	`
 
 var PreludeScript = `

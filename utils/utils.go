@@ -2,12 +2,15 @@ package utils
 
 import (
 	"bufio"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -188,12 +191,12 @@ func ViperInit() error {
 	return nil
 }
 
-func LoadAppConfig() (SidekickAppConfigFile, error) {
+func LoadAppConfig() (SidekickAppConfig, error) {
 	if !FileExists("./sidekick.yml") {
 		log.Fatalln("Sidekick app config not found. Please run sidekick init first")
 		os.Exit(1)
 	}
-	appConfigFile := SidekickAppConfigFile{}
+	appConfigFile := SidekickAppConfig{}
 	content, err := os.ReadFile("./sidekick.yml")
 	if err != nil {
 		fmt.Println(err)
@@ -205,4 +208,30 @@ func LoadAppConfig() (SidekickAppConfigFile, error) {
 	}
 
 	return appConfigFile, nil
+}
+
+func HandleEnvFile(envFileName string, envVariables []string, dockerEnvProperty []string, envFileChecksum *string) error {
+	envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", envFileName))
+	if envFileErr != nil {
+		pterm.Error.Println("Unable to process your env file")
+	}
+	for _, line := range strings.Split(string(envFileContent), "\n") {
+		if len(line) == 0 || strings.HasPrefix(line, "#") {
+			continue
+		}
+		envVariables = append(envVariables, strings.Split(line, "=")[0])
+	}
+
+	for _, envVar := range envVariables {
+		dockerEnvProperty = append(dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
+	}
+	// calculate and store the hash of env file to re-encrypt later on when changed
+	*envFileChecksum = fmt.Sprintf("%x", md5.Sum(envFileContent))
+	envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", envFileName))
+	// encrypt and save/override encrypted.env
+	envCmd.Stdin = strings.NewReader(EnvEncryptionScript)
+	if envCmdErr := envCmd.Run(); envCmdErr != nil {
+		return envCmdErr
+	}
+	return nil
 }
