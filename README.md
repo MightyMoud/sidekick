@@ -23,6 +23,7 @@ From bare metal to live side projects in minutes not hours
 - 🔥 Built in integration with SOPS
 - 🚀 Single command preview deployments
 - 🛸 Escape the vendorlock forever
+- 🔒 Security and best practices
 
 ## Motivation
 I'm fed up of the complexity required to host my side projects. While some services shine as lamp post in this era of heroku replacmenets, i.e fly.io, I believe simple VPS can go a long way. The motivation behind sidekick is to make hosting your side projects as simple as possible, as cheap as possible and as production ready as possible; you will be surprised how much traffic a 12$/mo instance on DO can handle.
@@ -65,3 +66,10 @@ Simple CLI tool that can help you:
 
 - Deploy accessory (mysql, pg, redis)
   Project with just docker file -> run `sidekick accessory pg` -> ask couple of questions -> db live with connection string
+
+## Improvements
+- Add new user called `sidekick` and use that instead of root
+- Disable password sign in with SSH - Only ssh keys allowed
+- Use watch tower to make zero down time deploys instead
+- Renew certs somehow
+- Ask for email for SSL certs
