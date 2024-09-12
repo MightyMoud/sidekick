@@ -6,7 +6,7 @@
     <img width="110px" src="https://emoji.aranja.com/static/emoji-data/img-apple-160/1f91b-1f3fb.png">
   </div>
 
-From bare metal to live side projects in minutes not hours
+Bare metal to production ready in mins; your own fly server on your VPS.
 
 ![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ms-mousa/sidekick)
@@ -18,15 +18,15 @@ From bare metal to live side projects in minutes not hours
 - 👍 One command VPS setup (docker, traefik, sops, age)
 - 💻 deploy any application from a dockerfile
 - ✊ Zero downtime deployment
+- 🌏 High availbility and load balancing
 - 🔒 Zero config TLS Certs
 - ✅ Connect domains or use sslip.io out of the box
 - 🔥 Built in integration with SOPS
-- 🚀 Single command preview deployments
 - 🛸 Escape the vendorlock forever
-- 🔒 Security and best practices
+
 
 ## Motivation
-I'm fed up of the complexity required to host my side projects. While some services shine as lamp post in this era of heroku replacmenets, i.e fly.io, I believe simple VPS can go a long way. The motivation behind sidekick is to make hosting your side projects as simple as possible, as cheap as possible and as production ready as possible; you will be surprised how much traffic a 12$/mo instance on DO can handle.
+I'm tired of the complexity involved in hosting my side projects. While some platforms, like Fly.io, stand out in the crowded field of Heroku replacements, I believe a simple VPS can be just as effective. That's why I created Sidekick: to make hosting side projects as straightforward, affordable, and production-ready as possible. You'll be surprised how much traffic a $8/month instance on DigitalOcean can handle.
 
 ## Inspiration
 - https://fly.io/

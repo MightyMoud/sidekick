@@ -158,10 +158,13 @@ var launchCmd = &cobra.Command{
 
 		multi.Start()
 
-		sshClient, err := utils.LoginStage(viper.Get("serverAddress").(string), loginSpinner, launchPb)
+		loginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
 		if err != nil {
+			loginSpinner.Fail("Something went wrong logging in to your VPS")
 			panic(err)
 		}
+		loginSpinner.Success("Logged in successfully!")
 		launchPb.Increment()
 
 		dockerBuildSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
@@ -181,15 +184,15 @@ var launchCmd = &cobra.Command{
 		if sessionErr != nil {
 			panic(sessionErr)
 		}
-		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 		rsync.Run()
 		if hasEnvFile {
-			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 			encryptSync.Run()
 
 			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
 			if sessionErr1 != nil {
-				panic(sessionErr1)
+				fmt.Println("something went wrong")
 			}
 		} else {
 			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))

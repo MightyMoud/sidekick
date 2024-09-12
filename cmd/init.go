@@ -26,9 +26,9 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/ms-mousa/sidekick/render"
 	"github.com/ms-mousa/sidekick/utils"
 	"github.com/pterm/pterm"
-	"github.com/pterm/pterm/putils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,13 +41,9 @@ var initCmd = &cobra.Command{
 		You wil neede to provide your VPS IPv4 address and a registery to host your docker images.
 		`,
 	Run: func(cmd *cobra.Command, args []string) {
-		pterm.Println()
-
-		s, _ := pterm.DefaultBigText.WithLetters(
-			putils.LettersFromStringWithStyle("Side", pterm.FgCyan.ToStyle()),
-			putils.LettersFromStringWithStyle("kick", pterm.FgLightMagenta.ToStyle())).Srender()
-		pterm.DefaultCenter.Println(s)
 		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
+
+		render.RenderSidekickBig()
 
 		// get server address
 		server := ""
@@ -84,6 +80,7 @@ var initCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
+		// init the sidekick system config
 		preludeCmd := exec.Command("sh", "-s", "-", server)
 		preludeCmd.Stdin = strings.NewReader(utils.PreludeScript)
 		if preludeCmdErr := preludeCmd.Run(); preludeCmdErr != nil {
@@ -91,7 +88,7 @@ var initCmd = &cobra.Command{
 		}
 
 		// setup viper for config
-		viper.SetConfigName("sidekick")
+		viper.SetConfigName("default")
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("$HOME/.config/sidekick/")
 		viper.Set("serverAddress", server)
@@ -99,27 +96,52 @@ var initCmd = &cobra.Command{
 		viper.Set("dockerUsername", dockerUsername)
 
 		multi := pterm.DefaultMultiPrinter
-		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(4).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
-		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
+		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(6).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
+		rootLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with root")
+		stage0Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Adding user Sidekick")
+		sidekickLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with sidekick user")
 		stage1Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up VPS")
 		stage2Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up Docker")
 		stage3Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up Traefik")
+		pterm.Println()
 		multi.Start()
 
-		sshClient, err := utils.LoginStage(server, loginSpinner, setupProgressBar)
+		rootLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		rootSshClient, err := utils.Login(server, "root")
 		if err != nil {
+			rootLoginSpinner.Fail("Something went wrong logging in to your VPS")
 			panic(err)
 		}
+		rootLoginSpinner.Success("Logged in successfully!")
+		setupProgressBar.Increment()
 
-		if err := utils.RunStage(sshClient, utils.SetupStage, stage1Spinner, setupProgressBar); err != nil {
+		stage0Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		if err := utils.RunStage(rootSshClient, utils.UsersetupStage); err != nil {
+			stage0Spinner.Fail(utils.UsersetupStage.SpinnerFailMessage)
 			panic(err)
 		}
+		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
+		setupProgressBar.Increment()
 
-		ch, sessionErr := utils.RunCommand(sshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
+		sidekickLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		sidekickSshClient, err := utils.Login(server, "sidekick")
+		if err != nil {
+			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
+			panic(err)
+		}
+		sidekickLoginSpinner.Success("Logged in successfully!")
+		setupProgressBar.Increment()
+
+		stage1Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		if err := utils.RunStage(sidekickSshClient, utils.SetupStage); err != nil {
+			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
+			panic(err)
+		}
+		ch, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
 		if sessionErr != nil {
+			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
 			panic(sessionErr)
 		}
-
 		select {
 		case output := <-ch:
 			if strings.HasPrefix(output, "Public key") {
@@ -128,14 +150,25 @@ var initCmd = &cobra.Command{
 				viper.WriteConfig()
 			}
 		}
+		stage1Spinner.Success(utils.SetupStage.SpinnerSuccessMessage)
+		setupProgressBar.Increment()
 
-		if err := utils.RunStage(sshClient, utils.DockerStage, stage2Spinner, setupProgressBar); err != nil {
+		stage2Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		if err := utils.RunStage(sidekickSshClient, utils.DockerStage); err != nil {
+			stage2Spinner.Fail(utils.DockerStage.SpinnerFailMessage)
 			panic(err)
 		}
+		stage2Spinner.Success(utils.DockerStage.SpinnerSuccessMessage)
+		setupProgressBar.Increment()
 
-		if err := utils.RunStage(sshClient, utils.GetTraefikStage(server), stage3Spinner, setupProgressBar); err != nil {
+		stage3Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		traefikStage := utils.GetTraefikStage(server)
+		if err := utils.RunStage(sidekickSshClient, traefikStage); err != nil {
+			stage3Spinner.Fail(traefikStage.SpinnerFailMessage)
 			panic(err)
 		}
+		stage3Spinner.Success(traefikStage.SpinnerSuccessMessage)
+		setupProgressBar.Increment()
 
 		if err := viper.WriteConfig(); err != nil {
 			panic(err)

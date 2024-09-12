@@ -17,7 +17,7 @@ var DockerHandleScript = `
 	projectFolder=$3
 	tag=${4:-"latest"}
 
-	docker build --tag $appName --platform linux/amd64 $projectFolder
+	docker build --cache-from=$dockerUsername/$appName:$tag --tag $appName --platform linux/amd64 $projectFolder 
 
 	docker tag $appName $dockerUsername/$appName:$tag
 
@@ -34,10 +34,9 @@ var PreludeScript = `
 
 	ssh-keyscan -H $HOSTNAME >> ~/.ssh/known_hosts
 
-	mkdir -p $HOME/.config
 	mkdir -p $HOME/.config/sidekick
 
-	CONFIG_FILE="$HOME/.config/sidekick/sidekick.yaml"
+	CONFIG_FILE="$HOME/.config/sidekick/default.yaml"
 	if [ ! -e "$CONFIG_FILE" ]; then
 	    touch "$CONFIG_FILE"
 	fi

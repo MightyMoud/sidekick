@@ -26,7 +26,7 @@ type CommandsStage struct {
 	SpinnerFailMessage    string
 }
 
-func GetSshClient(server string) (*ssh.Client, error) {
+func GetSshClient(server string, user string) (*ssh.Client, error) {
 	sshPort := "22"
 	// connect to local ssh-agent to grab all keys
 	sshAgentSock := os.Getenv("SSH_AUTH_SOCK")
@@ -55,13 +55,15 @@ func GetSshClient(server string) (*ssh.Client, error) {
 	// now that we have our key, we need to start ssh client sesssion
 	// ƒirst we make some config we pass later
 	config := &ssh.ClientConfig{
-		User: "root",
+		User: user,
 		Auth: []ssh.AuthMethod{
 			// passing the public keys to callback to get the auth methods
 			ssh.PublicKeysCallback(agentClient.Signers),
 		},
-		// FIX BEFORE PROD
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			// use OpenSSH's known_hosts file if you care about host validation
+			return nil
+		},
 	}
 
 	// create SSH client with the said config and connect to server
@@ -71,6 +73,14 @@ func GetSshClient(server string) (*ssh.Client, error) {
 	}
 
 	return client, nil
+}
+
+func Login(server string, user string) (*ssh.Client, error) {
+	sshClient, err := GetSshClient(server, user)
+	if err != nil {
+		return nil, err
+	}
+	return sshClient, nil
 }
 
 func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
@@ -134,27 +144,11 @@ func RunCommands(client *ssh.Client, commands []string) error {
 	return nil
 }
 
-func RunStage(client *ssh.Client, stage CommandsStage, spinner *pterm.SpinnerPrinter, progressBar *pterm.ProgressbarPrinter) error {
-	spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+func RunStage(client *ssh.Client, stage CommandsStage) error {
 	if err := RunCommands(client, stage.Commands); err != nil {
-		spinner.Fail(stage.SpinnerFailMessage)
 		return err
 	}
-	spinner.Success(stage.SpinnerSuccessMessage)
-	progressBar.Increment()
 	return nil
-}
-
-func LoginStage(server string, spinner *pterm.SpinnerPrinter, progressBar *pterm.ProgressbarPrinter) (*ssh.Client, error) {
-	spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-	sshClient, err := GetSshClient(server)
-	if err != nil {
-		spinner.Fail("Something went wrong logging in to your VPS")
-		return nil, err
-	}
-	spinner.Success("Logged in successfully!")
-	progressBar.Increment()
-	return sshClient, nil
 }
 
 func IsValidIPAddress(ip string) bool {
@@ -181,7 +175,7 @@ func FileExists(filename string) bool {
 }
 
 func ViperInit() error {
-	viper.SetConfigName("sidekick")
+	viper.SetConfigName("default")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/.config/sidekick/")
 	err := viper.ReadInConfig()

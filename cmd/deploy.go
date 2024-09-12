@@ -58,7 +58,7 @@ Run sidekick launch`)
 		}
 
 		multi := pterm.DefaultMultiPrinter
-		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
+		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("🚀 Deploying your app")
 		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
 		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
 		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a new version of your application")
@@ -75,10 +75,14 @@ Run sidekick launch`)
 			"$docker_username", viper.Get("dockerUsername").(string),
 		)
 
-		sshClient, err := utils.LoginStage(viper.Get("serverAddress").(string), loginSpinner, setupProgressBar)
+		loginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
 		if err != nil {
+			loginSpinner.Fail("Something went wrong logging in to your VPS")
 			panic(err)
 		}
+		loginSpinner.Success("Logged in successfully!")
+		setupProgressBar.Increment()
 
 		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		envFileChanged := false
@@ -95,15 +99,14 @@ Run sidekick launch`)
 				// encrypt new env file
 				envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", appConfig.Env.File))
 				envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
-				envCmd.Stdout = os.Stdout
-				envCmd.Stderr = os.Stderr
 				if envCmdErr := envCmd.Run(); envCmdErr != nil {
 					panic(envCmdErr)
 				}
-				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "root", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfig.Name)))
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfig.Name)))
 				encryptSync.Run()
 			}
 		}
+		defer os.Remove("encrypted.env")
 
 		cwd, _ := os.Getwd()
 		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, viper.Get("dockerUsername").(string), cwd, "latest")
