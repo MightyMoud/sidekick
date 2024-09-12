@@ -1,3 +1,17 @@
+/*
+Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+
+Licensed under the GNU AGPL License, Version 3.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+https://www.gnu.org/licenses/agpl-3.0.en.html
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package utils
 
 import "fmt"
@@ -48,14 +62,14 @@ var DockerStage = CommandsStage{
 	},
 }
 
-func GetTraefikStage(server string) CommandsStage {
+func GetTraefikStage(email string) CommandsStage {
 	return CommandsStage{
 		SpinnerSuccessMessage: "Successfully setup Traefik",
 		SpinnerFailMessage:    "Something went wrong setting up Traefik on your VPS",
 		Commands: []string{
 			"sudo apt-get install git -y",
 			"git clone https://github.com/ms-mousa/sidekick-traefik.git",
-			fmt.Sprintf(`cd sidekick-traefik && sed -i.bak "s/\$HOST/%s/g; s/\$PORT/%s/g" docker-compose.traefik.yml && rm docker-compose.traefik.yml.bak`, server, "8000"),
+			fmt.Sprintf(`cd sidekick-traefik/traefik && sed -i.bak 's/\$EMAIL/%s/g' traefik.yml && rm traefik.yml.bak`, email),
 			"sudo docker network create sidekick",
 			"cd sidekick-traefik && sudo docker compose -p sidekick -f docker-compose.traefik.yml up -d",
 		},
