@@ -6,7 +6,7 @@
     <img width="110px" src="https://emoji.aranja.com/static/emoji-data/img-apple-160/1f91b-1f3fb.png">
   </div>
 
-Bare metal to production ready in mins; your own fly server on your VPS.
+Bare metal to production ready in mins; imagine fly.io on your VPS
 
 ![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ms-mousa/sidekick)
