@@ -39,14 +39,18 @@ go install github.com/mightymoud/sidekick@latest
 
 ## Usage
 Sidekick helps you along all the steps of deployment on your VPS. From basic setup to zero downtime deploys, we got you! ✊
-First you need a VPS with Ubuntu LTS. I recommend DigitalOcean. Hetzner also gets very good reviews. You can host your own silicon too. As long as you have a public IP address you good to go and use sidekick. 
 
-Just make sure the following is true
+First you need a VPS with Ubuntu LTS. I recommend DigitalOcean. Hetzner also gets very good reviews. You can host your own silicon too. As long as you have a public IP address you can use Sidekick.
+
+Just make sure the following is true:
 - VPS running Ubuntu - LTS recommended
 - SSH Public Key availble on your machine to login to VPS.
 
-That's it, you're ready to use Sidekick
+That's it!
 ### VPS Setup
+  <div align="center" >
+    <img width="500px" src="/demo/imgs/init.png">
+  </div>
 First you need to setup your VPS. To do this you need to run:
 ```bash
 sidekick init
@@ -96,8 +100,38 @@ Should take around 2 more mins to be able to visit your application live on the 
 * Build your docker image locally for linux
 * Push the docker image to the registery
 * Encrpt your env file, if available and push it to your VPS
-* Spin up your docker image and route traffic to it on the specified port using Traefik
+* Use sops to dycrpt your env file and start and env with the values injected
+* Spin up your docker image using docker compose and route traffic to it using Traefik on the specified port
 </details>
+
+### Deploy a new version 
+  <div align="center" >
+    <img width="500px" src="/demo/imgs/deploy.png">
+  </div>
+With your application deployed, it's super simple to redeploy a new version.
+
+At any point any time you need to only run:
+```bash
+sidekick deploy
+```
+That's all. It won't take long, we use cache from earlier docker images, your latest version should be up soon.
+Sidekick will deploy the new version without any downtime - you can see more in the source code.
+This command will also do a couple of things behind the scenes. You can check that below
+
+
+<details>
+  <summary>What does Sidekick do when I run this command</summary>
+  
+* Build your docker image locally for linux
+* Compare your latest env file checksum for changes from last time you deployed your application.
+* If your env file has changed, sidekick will re encrypt it and replace the encrypte.env file on your server.
+* Deploy the new version with zero downtime deploys so you don't miss any traffic. 
+</details>
+
+### Deploy a preview environment
+Sidekick also allows you to deploy preview envs at aney point from your application. Preview envs are attached to your commit hash and require a clean git tree before you can initiate them. 
+
+This feature is still in development - I will add it to the next release when I'm happy with the way it works.
 
 
 ## Inspiration
@@ -114,34 +148,14 @@ Simple CLI tool that can help you:
 - Manage env secrets in a secure way
 - Connect any number of domains and subdomains to your projects with ease
 
-
+---
 ## Roadmap
-- Zero downtime deployments
-- Inject env secrets securely at run-time
-- Deploy preview environments of any application with ease
-- Handle more complex projects built with docker compose
-
-## Demo
-- Normal deployment
-  Empty nextjs project -> run `sidekick launch` -> app live with URL
-- Normal deployment + env file
-  Empty nextjs project -> make `sidekick.env.yaml` file with two lists "clear" & "secret" -> run `sidekick env` -> run `sidekick lanuch` -> app live with URL
-- Normal deployment + env file + new version
-  Same project -> run `sidekick deploy` -> Zero downtime deployment -> message when deployment is done and app is healthy
-- Normal deployment + env file + preview env
-  Make change into last project in home page -> commit file -> run `sidekick deploy preview` -> preview env live with URL
-
-- Docker compose deployment
-  Project with docker compose -> run `sidekick launch` -> app live with URL
-- Docker compose deployment with env file
-  Project with docker compose -> make `sidekick.env.yaml` file with two lists "clear" & "secret" -> run `sidekick env` -> run `sidekick launch` -> app live with URL
-
-- Deploy accessory (mysql, pg, redis)
-  Project with just docker file -> run `sidekick accessory pg` -> ask couple of questions -> db live with connection string
-
-## Improvements
-- Add new user called `sidekick` and use that instead of root
-- Disable password sign in with SSH - Only ssh keys allowed
-- Use watch tower to make zero down time deploys instead
-- Renew certs somehow
-- Ask for email for SSL certs
+I still have a couple more feature I want to add here. Also considering some of those to be on a paid version.
+- Preview env deployments
+- Better zero downtime deploys with watchtower
+- Firewall setup
+- Managing multiple VPSs
+- Easy way to deploy databases with one command
+- TUI for monitoring your VPS
+- Streaming down compose logs - ala `fly logs`
+- Auto deploy on image push - to work with CICD better
