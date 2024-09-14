@@ -150,6 +150,7 @@ Simple CLI tool that can help you:
 ## Roadmap
 I still have a couple more feature I want to add here. Also considering some of those to be on a paid version.
 - Preview env deployments
+- A way to deploy more complicated projects defined in docker compose file
 - Better zero downtime deploys with watchtower
 - Firewall setup
 - Managing multiple VPSs
