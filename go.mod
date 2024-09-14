@@ -1,4 +1,4 @@
-module github.com/ms-mousa/sidekick
+module github.com/mightymoud/sidekick
 
 go 1.22.4
 
