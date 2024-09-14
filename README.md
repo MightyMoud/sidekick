@@ -1,20 +1,18 @@
-
 <div align="center">
-  <h1>Sidekick</h1>
   <div>
     <img width="110px" src="https://emoji.aranja.com/static/emoji-data/img-apple-160/1f91c-1f3fb.png">
     <img width="110px" src="https://emoji.aranja.com/static/emoji-data/img-apple-160/1f91b-1f3fb.png">
   </div>
 
 Bare metal to production ready in mins; imagine fly.io on your VPS
+  <div>
+    <img width="500px" src="/demo/imgs/hero.png">
+  </div>
 
 ![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ms-mousa/sidekick)
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/ms-mousa/sidekick)
 
-  <div>
-    <img width="500px" src="/demo/imgs/hero.png">
-  </div>
 </div>
 
 ## Features
@@ -22,7 +20,7 @@ Bare metal to production ready in mins; imagine fly.io on your VPS
 - 💻 deploy any application from a dockerfile
 - ✊ Zero downtime deployment
 - 🌏 High availbility and load balancing
-- 🔒 Zero config TLS Certs
+- 🔒 Zero config SSL Certs
 - ✅ Connect domains or use sslip.io out of the box
 - 🔥 Built in integration with SOPS
 - 🛸 Escape the vendorlock forever
@@ -57,7 +55,7 @@ sidekick init
 ```
 Then you need to enter the following:
 - IP Address of your VPS
-- An email address to use for setting up TSL certs
+- An email address to use for setting up SSL certs
 - Docker registery to host your docker images - defaults to `docker.io`
 - Docker username in the said registery
 - Confirm you are currently logged in to that said registery with the username - This is needed to be able to push images on your behalf
@@ -72,7 +70,7 @@ After that Sidekick will setup many things on your VPS - Usually takes around 2 
 * Update and upgrade your Ubuntu system
 * Install `sops` and copy over the public key to your sidekick config file
 * Install Docker
-* Setup Traefik and TLS certs on your VPS
+* Setup Traefik and SSL certs on your VPS
 </details>
 
 ### Launch a new application
