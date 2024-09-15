@@ -9,9 +9,9 @@ Bare metal to production ready in mins; imagine fly.io on your VPS
     <img width="500px" src="/demo/imgs/hero.png">
   </div>
 
-![GitHub](https://img.shields.io/github/license/ms-mousa/sidekick)
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ms-mousa/sidekick)
-![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/ms-mousa/sidekick)
+![GitHub](https://img.shields.io/github/license/mightymoud/sidekick)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/mightymoud/sidekick)
+![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/mightymoud/sidekick)
 
 </div>
 
@@ -46,13 +46,17 @@ Just make sure the following is true:
 
 That's it!
 ### VPS Setup
+
   <div align="center" >
     <img width="500px" src="/demo/imgs/init.png">
   </div>
+
+
 First you need to setup your VPS. To do this you need to run:
 ```bash
 sidekick init
 ```
+
 Then you need to enter the following:
 - IP Address of your VPS
 - An email address to use for setting up SSL certs
@@ -61,6 +65,7 @@ Then you need to enter the following:
 - Confirm you are currently logged in to that said registery with the username - This is needed to be able to push images on your behalf
 
 After that Sidekick will setup many things on your VPS - Usually takes around 2 mins
+
 <details>
   <summary>What does Sidekick do when I run this command</summary>
   

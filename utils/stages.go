@@ -68,7 +68,7 @@ func GetTraefikStage(email string) CommandsStage {
 		SpinnerFailMessage:    "Something went wrong setting up Traefik on your VPS",
 		Commands: []string{
 			"sudo apt-get install git -y",
-			"git clone https://github.com/ms-mousa/sidekick-traefik.git",
+			"git clone https://github.com/mightymoud/sidekick-traefik.git",
 			fmt.Sprintf(`cd sidekick-traefik/traefik && sed -i.bak 's/\$EMAIL/%s/g' traefik.yml && rm traefik.yml.bak`, email),
 			"sudo docker network create sidekick",
 			"cd sidekick-traefik && sudo docker compose -p sidekick -f docker-compose.traefik.yml up -d",

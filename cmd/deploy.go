@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ms-mousa/sidekick/utils"
+	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

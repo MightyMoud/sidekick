@@ -14,7 +14,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/ms-mousa/sidekick/cmd"
+import "github.com/mightymoud/sidekick/cmd"
 
 func main() {
 	cmd.Execute()
