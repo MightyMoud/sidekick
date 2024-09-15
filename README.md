@@ -74,6 +74,8 @@ After that Sidekick will setup many things on your VPS - Usually takes around 2 
 * Logout from `root` and login with `sidekick`
 * Update and upgrade your Ubuntu system
 * Install `sops` and copy over the public key to your sidekick config file
+* Use `age` to make secret and public keys to use later for encrypting env file.
+* Send public key back to host machine to be used later for encryption
 * Install Docker
 * Setup Traefik and SSL certs on your VPS
 </details>
@@ -150,6 +152,26 @@ Simple CLI tool that can help you:
 - Deploy preview environments with ease
 - Manage env secrets in a secure way
 - Connect any number of domains and subdomains to your projects with ease
+
+## Remove sidekick
+
+You can easily remove sidekick if you hate it.
+
+```bash
+// Mac/Linux
+cd $HOME/go/bin
+rm sidekick
+cd ~/.config
+rm -rf sidekick
+
+// Win
+cd %USERPROFILE%\go\bin
+del sidekick.exe
+
+// Powershell
+cd $HOME\go\bin
+Remove-Item sidekick.exe
+```
 
 ---
 ## Roadmap
