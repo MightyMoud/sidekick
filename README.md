@@ -134,9 +134,28 @@ This command will also do a couple of things behind the scenes. You can check th
 </details>
 
 ### Deploy a preview environment
-Sidekick also allows you to deploy preview envs at aney point from your application. Preview envs are attached to your commit hash and require a clean git tree before you can initiate them. 
+  <div align="center" >
+    <img width="500px" src="/demo/imgs/preview.png">
+  </div>
+Sidekick also allows you to deploy preview envs at any point from your application. Preview envs are attached to your commit hash and require a clean git tree before you can initiate them. 
+Once you have a clean git tree, you can run the following command to deploy a preview environment:
 
-This feature is still in development - I will add it to the next release when I'm happy with the way it works.
+```bash
+sidekick deploy preview
+```
+
+
+<details>
+  <summary>What does Sidekick do when I run this command</summary>
+  
+* Build your docker image locally for linux
+* Tag the new image with the short checksum of your git commit
+* Compare your latest env file checksum for changes from last time you deployed your application.
+* If your env file has changed, sidekick will re encrypt it and replace the encrypte.env file on your server.
+* Add a new folder inside your app folder called "preview" where Sidekick will store and manage all your preview deployments
+* Deploy a new version of your app reachable on a short hash based subdomain
+</details>
+
 
 
 ## Inspiration

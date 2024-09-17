@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
@@ -169,9 +170,9 @@ to quickly create a Cobra application.`,
 			}
 		}
 		previewEnvConfig := utils.SidekickPreview{
-			Name:  serviceName,
-			Url:   fmt.Sprintf("https://%s", previewURL),
-			Image: imageName,
+			Url:       fmt.Sprintf("https://%s", previewURL),
+			Image:     imageName,
+			CreatedAt: time.Now().Format(time.UnixDate),
 		}
 		appConfig.PreviewEnvs = map[string]utils.SidekickPreview{
 			deployHash: previewEnvConfig,
@@ -184,14 +185,14 @@ to quickly create a Cobra application.`,
 		multi.Stop()
 
 		pterm.Println()
-		pterm.Info.Printfln("😎 Access your app at: https://%s.%s", deployHash, appConfig.Url)
+		pterm.Info.Printfln("😎 Access your preview app at: https://%s.%s", deployHash, appConfig.Url)
 		pterm.Println()
 
 	},
 }
 
 func init() {
-
+	deployCmd.AddCommand(previewCmd)
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

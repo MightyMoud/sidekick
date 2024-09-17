@@ -17,11 +17,13 @@ package utils
 type DockerService struct {
 	Image       string   `yaml:"image"`
 	Command     string   `yaml:"command,omitempty"`
+	Restart     string   `yaml:"restart,omitempty"`
 	Ports       []string `yaml:"ports,omitempty"`
 	Volumes     []string `yaml:"volumes,omitempty"`
 	Labels      []string `yaml:"labels,omitempty"`
 	Networks    []string `yaml:"networks,omitempty"`
 	Environment []string `yaml:"environment,omitempty"`
+	DependsOn   []string `yaml:"depends_on,omitempty"`
 }
 
 type DockerNetwork struct {
@@ -30,18 +32,22 @@ type DockerNetwork struct {
 
 type DockerComposeFile struct {
 	Services map[string]DockerService `yaml:"services"`
-	Networks map[string]DockerNetwork `yaml:"networks"`
+	Networks map[string]DockerNetwork `yaml:"networks,omitempty"`
+	Volumes  map[string]DockerVolume  `yaml:"volumes,omitempty"`
 }
 
+type DockerVolume struct {
+	Driver string `yaml:"driver,omitempty"`
+}
 type SidekickAppEnvConfig struct {
 	File string `yaml:"file"`
 	Hash string `yaml:"hash"`
 }
 
 type SidekickPreview struct {
-	Name  string `yaml:"name"`
-	Url   string `yaml:"url"`
-	Image string `yaml:"image"`
+	Url       string `yaml:"url"`
+	Image     string `yaml:"image"`
+	CreatedAt string `yaml:"createdAt"`
 }
 
 type SidekickAppConfig struct {
@@ -52,5 +58,5 @@ type SidekickAppConfig struct {
 	Port        uint64                     `yaml:"port"`
 	CreatedAt   string                     `yaml:"createdAt"`
 	Env         SidekickAppEnvConfig       `yaml:"env,omitempty"`
-	PreviewEnvs map[string]SidekickPreview `yaml:"previewEnvs"`
+	PreviewEnvs map[string]SidekickPreview `yaml:"previewEnvs,omitempty"`
 }

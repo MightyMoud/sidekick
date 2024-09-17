@@ -31,7 +31,7 @@ var DockerHandleScript = `
 	projectFolder=$3
 	tag=${4:-"latest"}
 
-	docker build --cache-from=$dockerUsername/$appName:$tag --tag $appName --platform linux/amd64 $projectFolder 
+	docker build --cache-from=$dockerUsername/$appName:latest --tag $appName --platform linux/amd64 $projectFolder 
 
 	docker tag $appName $dockerUsername/$appName:$tag
 
