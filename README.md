@@ -19,7 +19,7 @@ Bare metal to production ready in mins; imagine fly.io on your VPS
 - 👍 One command VPS setup (docker, traefik, sops, age)
 - 💻 deploy any application from a dockerfile
 - ✊ Zero downtime deployment
-- 🌏 High availbility and load balancing
+- 🌏 High availability and load balancing
 - 🔒 Zero config SSL Certs
 - ✅ Connect domains or use sslip.io out of the box
 - 🔥 Built in integration with SOPS
