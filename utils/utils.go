@@ -31,6 +31,9 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/crypto/ssh/knownhosts"
+	"os/user"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,7 +43,7 @@ type CommandsStage struct {
 	SpinnerFailMessage    string
 }
 
-func GetSshClient(server string, user string) (*ssh.Client, error) {
+func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 	sshPort := "22"
 	// connect to local ssh-agent to grab all keys
 	sshAgentSock := os.Getenv("SSH_AUTH_SOCK")
@@ -66,18 +69,19 @@ func GetSshClient(server string, user string) (*ssh.Client, error) {
 		return nil, err
 	}
 
+	currentUser, err := user.Current()
+	knownHostsCallback, err := knownhosts.New(fmt.Sprintf("%s/.ssh/known_hosts", currentUser.HomeDir))
+	if err != nil {
+		log.Fatalf("Error loading known hosts: %v", err)
+		os.Exit(1)
+	}
 	// now that we have our key, we need to start ssh client sesssion
-	// ƒirst we make some config we pass later
 	config := &ssh.ClientConfig{
-		User: user,
+		User: sshUser,
 		Auth: []ssh.AuthMethod{
-			// passing the public keys to callback to get the auth methods
 			ssh.PublicKeysCallback(agentClient.Signers),
 		},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			// use OpenSSH's known_hosts file if you care about host validation
-			return nil
-		},
+		HostKeyCallback: knownHostsCallback,
 	}
 
 	// create SSH client with the said config and connect to server

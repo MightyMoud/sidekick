@@ -98,6 +98,12 @@ var initCmd = &cobra.Command{
 		viper.Set("dockerUsername", dockerUsername)
 		viper.Set("certEmail", certEmail)
 
+		keyAddSshCommand := exec.Command("sh", "-s", "-", server)
+		keyAddSshCommand.Stdin = strings.NewReader(utils.SshKeysScript)
+		if sshAddErr := keyAddSshCommand.Run(); sshAddErr != nil {
+			panic(sshAddErr)
+		}
+
 		multi := pterm.DefaultMultiPrinter
 		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(6).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
 		rootLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with root")
