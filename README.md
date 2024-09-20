@@ -105,7 +105,7 @@ Should take around 2 more mins to be able to visit your application live on the 
 * Build your docker image locally for linux
 * Push the docker image to the registery
 * Encrpt your env file, if available and push it to your VPS
-* Use sops to dycrpt your env file and start and env with the values injected
+* Use sops to decrypt your env file and start and env with the values injected
 * Spin up your docker image using docker compose and route traffic to it using Traefik on the specified port
 </details>
 
