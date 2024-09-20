@@ -42,7 +42,7 @@ First you need a VPS with Ubuntu LTS. I recommend DigitalOcean. Hetzner also get
 
 Just make sure the following is true:
 - VPS running Ubuntu - LTS recommended
-- SSH Public Key availble on your machine to login to VPS.
+- SSH Public Key available on your machine to login to VPS.
 
 That's it!
 ### VPS Setup
