@@ -14,17 +14,6 @@ limitations under the License.
 */
 package utils
 
-var SshKeysScript = `
-	if [ "$#" -ne 1 ]; then
-	    echo "Usage: $0 <hostname>"
-	    exit 1
-	fi
-
-	HOSTNAME=$1
-
-	ssh-keyscan -H $HOSTNAME >> ~/.ssh/known_hosts
-	`
-
 var DockerHandleScript = `
 	appName=$1
 	dockerUsername=$2

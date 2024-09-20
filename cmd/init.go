@@ -82,7 +82,7 @@ var initCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
-		// init the sidekick system config
+		// init the sidekick system config && add public key to known_hosts
 		preludeCmd := exec.Command("sh", "-s", "-", server)
 		preludeCmd.Stdin = strings.NewReader(utils.PreludeScript)
 		if preludeCmdErr := preludeCmd.Run(); preludeCmdErr != nil {
@@ -97,12 +97,6 @@ var initCmd = &cobra.Command{
 		viper.Set("dockerRegistery", dockerRegistery)
 		viper.Set("dockerUsername", dockerUsername)
 		viper.Set("certEmail", certEmail)
-
-		keyAddSshCommand := exec.Command("sh", "-s", "-", server)
-		keyAddSshCommand.Stdin = strings.NewReader(utils.SshKeysScript)
-		if sshAddErr := keyAddSshCommand.Run(); sshAddErr != nil {
-			panic(sshAddErr)
-		}
 
 		multi := pterm.DefaultMultiPrinter
 		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(6).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
