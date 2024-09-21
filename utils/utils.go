@@ -19,19 +19,20 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"github.com/skeema/knownhosts"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+
 	"time"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"golang.org/x/crypto/ssh/knownhosts"
 	"os/user"
 
 	"gopkg.in/yaml.v3"
@@ -41,6 +42,28 @@ type CommandsStage struct {
 	Commands              []string
 	SpinnerSuccessMessage string
 	SpinnerFailMessage    string
+}
+
+func inspectServerPublicKey(key ssh.PublicKey) {
+	sshKeyCmd := exec.Command("sh", "-s", "-", string(ssh.MarshalAuthorizedKey(key)))
+	sshKeyCmd.Stdin = strings.NewReader(sshKeyScript)
+	result, sshKeyCmdErr := sshKeyCmd.Output()
+	if sshKeyCmdErr != nil {
+		panic(sshKeyCmdErr)
+	}
+	resultLines := strings.Split(string(result), "\n")
+	keyHash := resultLines[0]
+
+	startColor := pterm.NewRGB(0, 255, 255)
+	endColor := pterm.NewRGB(255, 0, 255)
+
+	pterm.DefaultCenter.Print(keyHash)
+	for i := 0; i < len(resultLines[1:]); i++ {
+		fadeFactor := float32(i) / float32(20)
+		currentColor := startColor.Fade(0, 1, fadeFactor, endColor)
+		pterm.DefaultCenter.Print(currentColor.Sprint(resultLines[1:][i]))
+	}
+
 }
 
 func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
@@ -69,19 +92,51 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 		return nil, err
 	}
 
-	currentUser, err := user.Current()
-	knownHostsCallback, err := knownhosts.New(fmt.Sprintf("%s/.ssh/known_hosts", currentUser.HomeDir))
-	if err != nil {
-		log.Fatalf("Error loading known hosts: %v", err)
-		os.Exit(1)
-	}
+	cb := ssh.HostKeyCallback(func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		currentUser, _ := user.Current()
+		khPath := fmt.Sprintf("%s/.ssh/known_hosts", currentUser.HomeDir)
+		kh, knErr := knownhosts.NewDB(khPath)
+		if knErr != nil {
+			log.Fatalf("Failed to read known_hosts: %s", err)
+		}
+
+		innerCallback := kh.HostKeyCallback()
+		err := innerCallback(hostname, remote, key)
+		if knownhosts.IsHostKeyChanged(err) {
+			return fmt.Errorf("REMOTE HOST IDENTIFICATION HAS CHANGED for host %s! This may indicate a MitM attack.", hostname)
+		} else if knownhosts.IsHostUnknown(err) {
+			inspectServerPublicKey(key)
+			prompt := pterm.DefaultInteractiveContinue
+
+			pterm.DefaultCenter.Printf(pterm.FgYellow.Sprintf("This is the ASCII art and fingerprint of your VPS's public key at %s", hostname))
+			pterm.DefaultCenter.Printf(pterm.FgYellow.Sprint("Please confirm you want to continue with the connection"))
+			pterm.DefaultCenter.Printf(pterm.FgYellow.Sprint("Sidekick will add this host/key pair to known_hosts"))
+			pterm.Println()
+
+			prompt.DefaultText = "Would you like to proceed?"
+			prompt.Options = []string{"yes", "no"}
+			if result, _ := prompt.Show(); result != "yes" {
+				pterm.Error.Println("In order to continue, you need to accept this.")
+				os.Exit(0)
+			}
+			f, ferr := os.OpenFile(khPath, os.O_APPEND|os.O_WRONLY, 0600)
+			if ferr == nil {
+				defer f.Close()
+				ferr = knownhosts.WriteKnownHost(f, hostname, remote, key)
+			} else {
+				log.Printf("Failed to add host %s to known_hosts: %v\n", hostname, ferr)
+			}
+			return nil
+		}
+		return err
+	})
 	// now that we have our key, we need to start ssh client sesssion
 	config := &ssh.ClientConfig{
 		User: sshUser,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeysCallback(agentClient.Signers),
 		},
-		HostKeyCallback: knownHostsCallback,
+		HostKeyCallback: cb,
 	}
 
 	// create SSH client with the said config and connect to server

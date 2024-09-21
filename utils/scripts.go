@@ -14,6 +14,12 @@ limitations under the License.
 */
 package utils
 
+var sshKeyScript = `
+		publicKey=$1
+
+		echo "$publicKey" | ssh-keygen -lvf /dev/stdin 
+	`
+
 var DockerHandleScript = `
 	appName=$1
 	dockerUsername=$2
@@ -28,15 +34,6 @@ var DockerHandleScript = `
 	`
 
 var PreludeScript = `
-	if [ "$#" -ne 1 ]; then
-	    echo "Usage: $0 <hostname>"
-	    exit 1
-	fi
-
-	HOSTNAME=$1
-
-	ssh-keyscan -H $HOSTNAME >> ~/.ssh/known_hosts
-
 	mkdir -p $HOME/.config/sidekick
 
 	CONFIG_FILE="$HOME/.config/sidekick/default.yaml"
