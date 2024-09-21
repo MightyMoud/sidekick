@@ -46,7 +46,7 @@ var launchCmd = &cobra.Command{
 			panic(sshAddErr)
 		}
 
-		if utils.FileExists("./dockerfile") {
+		if utils.FileExists("./Dockerfile") {
 			pterm.Info.Println("Dockerfile detected - scanning file for details")
 		} else {
 			pterm.Error.Println("No dockerfiles found in current directory.")
