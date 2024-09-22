@@ -40,12 +40,6 @@ var launchCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		keyAddSshCommand := exec.Command("sh", "-s", "-", viper.Get("serverAddress").(string))
-		keyAddSshCommand.Stdin = strings.NewReader(utils.SshKeysScript)
-		if sshAddErr := keyAddSshCommand.Run(); sshAddErr != nil {
-			panic(sshAddErr)
-		}
-
 		if utils.FileExists("./Dockerfile") {
 			pterm.Info.Println("Dockerfile detected - scanning file for details")
 		} else {

@@ -3,6 +3,7 @@ module github.com/mightymoud/sidekick
 go 1.22.4
 
 require (
+	github.com/skeema/knownhosts v1.3.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	golang.org/x/crypto v0.24.0

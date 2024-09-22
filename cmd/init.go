@@ -15,6 +15,7 @@ limitations under the License.
 package cmd
 
 import (
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -82,8 +83,8 @@ var initCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
-		// init the sidekick system config
-		preludeCmd := exec.Command("sh", "-s", "-", server)
+		// init the sidekick system config && add public key to known_hosts
+		preludeCmd := exec.Command("sh", "-s", "-")
 		preludeCmd.Stdin = strings.NewReader(utils.PreludeScript)
 		if preludeCmdErr := preludeCmd.Run(); preludeCmdErr != nil {
 			panic(preludeCmdErr)
@@ -98,9 +99,20 @@ var initCmd = &cobra.Command{
 		viper.Set("dockerUsername", dockerUsername)
 		viper.Set("certEmail", certEmail)
 
+		pterm.Println()
+		pterm.DefaultHeader.WithFullWidth().Println("Sidekick booting up! 🚀")
+		pterm.Println()
+
+		// init login with checking handshake
+		rootSshClient, err := utils.Login(server, "root")
+		if err != nil {
+			log.Fatalf("Unable to login using 'root' user: %s", err)
+			os.Exit(1)
+		}
+
 		multi := pterm.DefaultMultiPrinter
 		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(6).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
-		rootLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with root")
+		rootLoginSpinner, _ := pterm.DefaultSpinner.Start("Logging in with root")
 		stage0Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Adding user Sidekick")
 		sidekickLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with sidekick user")
 		stage1Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up VPS")
@@ -109,12 +121,6 @@ var initCmd = &cobra.Command{
 		pterm.Println()
 		multi.Start()
 
-		rootLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		rootSshClient, err := utils.Login(server, "root")
-		if err != nil {
-			rootLoginSpinner.Fail("Something went wrong logging in to your VPS")
-			panic(err)
-		}
 		rootLoginSpinner.Success("Logged in successfully!")
 		setupProgressBar.Increment()
 
@@ -132,7 +138,7 @@ var initCmd = &cobra.Command{
 			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
 			panic(err)
 		}
-		sidekickLoginSpinner.Success("Logged in successfully!")
+		sidekickLoginSpinner.Success("Logged in successfully with new user!")
 		setupProgressBar.Increment()
 
 		stage1Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
