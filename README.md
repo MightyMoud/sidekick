@@ -42,7 +42,7 @@ First you need a VPS with Ubuntu LTS. I recommend DigitalOcean. Hetzner also get
 
 Just make sure the following is true:
 - VPS running Ubuntu - LTS recommended
-- SSH Public Key availble on your machine to login to VPS.
+- SSH Public Key available on your machine to login to VPS.
 
 That's it!
 ### VPS Setup
@@ -60,9 +60,9 @@ sidekick init
 Then you need to enter the following:
 - IP Address of your VPS
 - An email address to use for setting up SSL certs
-- Docker registery to host your docker images - defaults to `docker.io`
-- Docker username in the said registery
-- Confirm you are currently logged in to that said registery with the username - This is needed to be able to push images on your behalf
+- Docker registry to host your docker images - defaults to `docker.io`
+- Docker username in the said registry
+- Confirm you are currently logged in to that said registry with the username - This is needed to be able to push images on your behalf
 
 After that Sidekick will setup many things on your VPS - Usually takes around 2 mins
 
@@ -85,7 +85,7 @@ After that Sidekick will setup many things on your VPS - Usually takes around 2 
     <img width="500px" src="/demo/imgs/launch.png">
   </div>
 
-In your application folder, make sure you have a working `Dockerfile` that you can build and run. Also make sure you know at which port your app is expecting to recieve traffic.
+In your application folder, make sure you have a working `Dockerfile` that you can build and run. Also make sure you know at which port your app is expecting to receive traffic.
 
 Then run:
 ```bash
@@ -103,8 +103,8 @@ Should take around 2 more mins to be able to visit your application live on the 
   <summary>What does Sidekick do when I run this command</summary>
   
 * Build your docker image locally for linux
-* Push the docker image to the registery
-* Encrpt your env file, if available and push it to your VPS
+* Push the docker image to the registry
+* Encrypt your env file, if available and push it to your VPS
 * Use sops to dycrpt your env file and start and env with the values injected
 * Spin up your docker image using docker compose and route traffic to it using Traefik on the specified port
 </details>
@@ -129,7 +129,7 @@ This command will also do a couple of things behind the scenes. You can check th
   
 * Build your docker image locally for linux
 * Compare your latest env file checksum for changes from last time you deployed your application.
-* If your env file has changed, sidekick will re encrypt it and replace the encrypte.env file on your server.
+* If your env file has changed, sidekick will re encrypt it and replace the encrypted.env file on your server.
 * Deploy the new version with zero downtime deploys so you don't miss any traffic. 
 </details>
 
@@ -151,7 +151,7 @@ sidekick deploy preview
 * Build your docker image locally for linux
 * Tag the new image with the short checksum of your git commit
 * Compare your latest env file checksum for changes from last time you deployed your application.
-* If your env file has changed, sidekick will re encrypt it and replace the encrypte.env file on your server.
+* If your env file has changed, sidekick will re encrypt it and replace the encrypted.env file on your server.
 * Add a new folder inside your app folder called "preview" where Sidekick will store and manage all your preview deployments
 * Deploy a new version of your app reachable on a short hash based subdomain
 </details>
