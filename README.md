@@ -60,9 +60,6 @@ sidekick init
 Then you need to enter the following:
 - IP Address of your VPS
 - An email address to use for setting up SSL certs
-- Docker registry to host your docker images - defaults to `docker.io`
-- Docker username in the said registry
-- Confirm you are currently logged in to that said registry with the username - This is needed to be able to push images on your behalf
 
 After that Sidekick will setup many things on your VPS - Usually takes around 2 mins
 

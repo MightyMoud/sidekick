@@ -68,8 +68,11 @@ to quickly create a Cobra application.`,
 		deployHash := string(hashOutput)
 		deployHash = strings.TrimSuffix(deployHash, "\n")
 
+		pterm.Println()
+		pterm.DefaultHeader.WithFullWidth().Println("Deploying a preview env of your app 😎")
+		pterm.Println()
+
 		multi := pterm.DefaultMultiPrinter
-		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("Deploying your preview env")
 		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
 		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
 		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a preview env of your application")
@@ -83,7 +86,6 @@ to quickly create a Cobra application.`,
 			panic(err)
 		}
 		loginSpinner.Success("Logged in successfully!")
-		setupProgressBar.Increment()
 
 		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 
@@ -98,7 +100,7 @@ to quickly create a Cobra application.`,
 		}
 		defer os.Remove("encrypted.env")
 
-		imageName := fmt.Sprintf("%s/%s:%s", viper.Get("dockerUsername").(string), appConfig.Name, deployHash)
+		imageName := fmt.Sprintf("%s:%s", appConfig.Name, deployHash)
 		serviceName := fmt.Sprintf("%s-%s", appConfig.Name, deployHash)
 		previewURL := fmt.Sprintf("%s.%s", deployHash, appConfig.Url)
 		newService := utils.DockerService{
@@ -139,13 +141,28 @@ to quickly create a Cobra application.`,
 		defer os.Remove("docker-compose.yaml")
 
 		cwd, _ := os.Getwd()
-		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, viper.Get("dockerUsername").(string), cwd, deployHash)
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, cwd, deployHash)
+		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
 		// better handle of errors -> Push it to another writer aside from os.stderr and then flush it when it panics
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			log.Fatalln("Failed to run docker")
 			os.Exit(1)
 		}
+
+		imgMoveCmd := exec.Command("sh", "-s", "-", appConfig.Name, "sidekick", viper.GetString("serverAddress"), deployHash)
+		imgMoveCmd.Stdin = strings.NewReader(utils.ImageMoveScript)
+		_, imgMoveErr := imgMoveCmd.Output()
+		if imgMoveErr != nil {
+			log.Fatalf("Issue occured with moving image to your VPS: %s", imgMoveErr)
+			os.Exit(1)
+		}
+		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-%s.tar", appConfig.Name, appConfig.Name, deployHash)); sessionErr != nil {
+			log.Fatal("Issue happened loading docker image")
+		}
+		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-%s.tar", appConfig.Name, deployHash))); sessionErr != nil {
+			log.Fatal("Issue happened cleaning up the image file")
+		}
+
 		dockerBuildStageSpinner.Success("Successfully built and pushed docker image")
 
 		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}

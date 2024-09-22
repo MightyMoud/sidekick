@@ -17,6 +17,7 @@ package cmd
 import (
 	"crypto/md5"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -49,9 +50,11 @@ to quickly create a Cobra application.`,
 Run sidekick launch`)
 			os.Exit(1)
 		}
+		pterm.Println()
+		pterm.DefaultHeader.WithFullWidth().Println("Deploying a new version of your app 😏")
+		pterm.Println()
 
 		multi := pterm.DefaultMultiPrinter
-		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("🚀 Deploying your app")
 		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
 		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
 		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a new version of your application")
@@ -65,7 +68,6 @@ Run sidekick launch`)
 		replacer := strings.NewReplacer(
 			"$service_name", appConfig.Name,
 			"$app_port", fmt.Sprint(appConfig.Port),
-			"$docker_username", viper.Get("dockerUsername").(string),
 		)
 
 		loginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
@@ -75,7 +77,6 @@ Run sidekick launch`)
 			panic(err)
 		}
 		loginSpinner.Success("Logged in successfully!")
-		setupProgressBar.Increment()
 
 		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		envFileChanged := false
@@ -102,14 +103,25 @@ Run sidekick launch`)
 		defer os.Remove("encrypted.env")
 
 		cwd, _ := os.Getwd()
-		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, viper.Get("dockerUsername").(string), cwd, "latest")
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, cwd)
+		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			panic(dockerBuildErr)
 		}
 		dockerBuildStageSpinner.Success("Latest docker image built")
 
 		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		imgMoveCmd := exec.Command("sh", "-s", "-", appConfig.Name, "sidekick", viper.GetString("serverAddress"))
+		imgMoveCmd.Stdin = strings.NewReader(utils.ImageMoveScript)
+		_, imgMoveErr := imgMoveCmd.Output()
+		if imgMoveErr != nil {
+			log.Fatalf("Issue occured with moving image to your VPS: %s", imgMoveErr)
+			os.Exit(1)
+		}
+		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appConfig.Name, appConfig.Name)); sessionErr != nil {
+			log.Fatal("Issue happened loading docker image")
+		}
+
 		if appConfig.Env.File != "" {
 			deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
 			_, sessionErr := utils.RunCommand(sshClient, deployScript)
@@ -122,6 +134,9 @@ Run sidekick launch`)
 			if sessionErr != nil {
 				panic(sessionErr)
 			}
+		}
+		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-latest.tar", appConfig.Name))); sessionErr != nil {
+			log.Fatal("Issue happened cleaning up the image file")
 		}
 
 		latestVersion := strings.Split(appConfig.Version, "")[1]

@@ -58,31 +58,6 @@ var initCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
-		dockerRegistery := ""
-		dockerRegisteryTextInput := pterm.DefaultInteractiveTextInput.WithDefaultValue("docker.io")
-		dockerRegisteryTextInput.DefaultText = "Please enter your docker registery"
-		dockerRegistery, _ = dockerRegisteryTextInput.Show()
-
-		dockerUsername := ""
-		dokerUsernameTextInput := pterm.DefaultInteractiveTextInput
-		dokerUsernameTextInput.DefaultText = "Please enter your docker username for the registery"
-		dockerUsername, _ = dokerUsernameTextInput.Show()
-		if dockerUsername == "" {
-			pterm.Error.Println("You have to enter your docker username")
-			os.Exit(0)
-		}
-
-		prompt := pterm.DefaultInteractiveContinue
-		prompt.DefaultText = "Are you logged in to the docker registery?"
-		prompt.Options = []string{"yes", "no"}
-		if result, _ := prompt.Show(); result != "yes" {
-			pterm.Println()
-			pterm.Error.Printfln("You need to login to your docker registery %s", dockerRegistery)
-			pterm.Info.Printfln("You can do so by running `docker login %s`", dockerRegistery)
-			pterm.Println()
-			os.Exit(0)
-		}
-
 		// init the sidekick system config && add public key to known_hosts
 		preludeCmd := exec.Command("sh", "-s", "-")
 		preludeCmd.Stdin = strings.NewReader(utils.PreludeScript)
@@ -95,8 +70,6 @@ var initCmd = &cobra.Command{
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("$HOME/.config/sidekick/")
 		viper.Set("serverAddress", server)
-		viper.Set("dockerRegistery", dockerRegistery)
-		viper.Set("dockerUsername", dockerUsername)
 		viper.Set("certEmail", certEmail)
 
 		pterm.Println()
@@ -111,7 +84,6 @@ var initCmd = &cobra.Command{
 		}
 
 		multi := pterm.DefaultMultiPrinter
-		setupProgressBar, _ := pterm.DefaultProgressbar.WithTotal(6).WithWriter(multi.NewWriter()).Start("Sidekick Booting up (2m estimated)  ")
 		rootLoginSpinner, _ := pterm.DefaultSpinner.Start("Logging in with root")
 		stage0Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Adding user Sidekick")
 		sidekickLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with sidekick user")
@@ -122,7 +94,6 @@ var initCmd = &cobra.Command{
 		multi.Start()
 
 		rootLoginSpinner.Success("Logged in successfully!")
-		setupProgressBar.Increment()
 
 		stage0Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		if err := utils.RunStage(rootSshClient, utils.UsersetupStage); err != nil {
@@ -130,7 +101,6 @@ var initCmd = &cobra.Command{
 			panic(err)
 		}
 		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
-		setupProgressBar.Increment()
 
 		sidekickLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		sidekickSshClient, err := utils.Login(server, "sidekick")
@@ -139,7 +109,6 @@ var initCmd = &cobra.Command{
 			panic(err)
 		}
 		sidekickLoginSpinner.Success("Logged in successfully with new user!")
-		setupProgressBar.Increment()
 
 		stage1Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		if err := utils.RunStage(sidekickSshClient, utils.SetupStage); err != nil {
@@ -160,7 +129,6 @@ var initCmd = &cobra.Command{
 			}
 		}
 		stage1Spinner.Success(utils.SetupStage.SpinnerSuccessMessage)
-		setupProgressBar.Increment()
 
 		stage2Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		if err := utils.RunStage(sidekickSshClient, utils.DockerStage); err != nil {
@@ -168,7 +136,6 @@ var initCmd = &cobra.Command{
 			panic(err)
 		}
 		stage2Spinner.Success(utils.DockerStage.SpinnerSuccessMessage)
-		setupProgressBar.Increment()
 
 		stage3Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		traefikStage := utils.GetTraefikStage(certEmail)
@@ -177,13 +144,16 @@ var initCmd = &cobra.Command{
 			panic(err)
 		}
 		stage3Spinner.Success(traefikStage.SpinnerSuccessMessage)
-		setupProgressBar.Increment()
 
 		if err := viper.WriteConfig(); err != nil {
 			panic(err)
 		}
 
 		multi.Stop()
+
+		pterm.Println()
+		pterm.Info.Println("Your VPS is ready! You can now run Sidekick launch in your app folder")
+		pterm.Println()
 	},
 }
 

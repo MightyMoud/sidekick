@@ -20,19 +20,6 @@ var sshKeyScript = `
 		echo "$publicKey" | ssh-keygen -lvf /dev/stdin 
 	`
 
-var DockerHandleScript = `
-	appName=$1
-	dockerUsername=$2
-	projectFolder=$3
-	tag=${4:-"latest"}
-
-	docker build --cache-from=$dockerUsername/$appName:latest --tag $appName --platform linux/amd64 $projectFolder 
-
-	docker tag $appName $dockerUsername/$appName:$tag
-
-	docker push $dockerUsername/$appName:$tag
-	`
-
 var PreludeScript = `
 	mkdir -p $HOME/.config/sidekick
 
@@ -40,6 +27,27 @@ var PreludeScript = `
 	if [ ! -e "$CONFIG_FILE" ]; then
 	    touch "$CONFIG_FILE"
 	fi
+	`
+
+var ImageMoveScript = `
+	appName=$1
+	user=$2
+	server=$3
+	tag=${4:-"latest"}
+
+	scp -C $appName-$tag.tar $user@$server:./$appName
+
+	rm $appName-$tag.tar
+	`
+
+var DockerBuildAndSaveScript = `
+	appName=$1
+	projectFolder=$2
+	tag=${3:-"latest"}
+
+	docker build --cache-from=$appName:latest --tag $appName:$tag --platform linux/amd64 $projectFolder 
+
+	docker save -o $appName-$tag.tar $appName
 	`
 
 var EnvEncryptionScript = `
@@ -52,7 +60,6 @@ var EnvEncryptionScript = `
 var DeployAppWithEnvScript = `
 	cd $service_name && \
 	old_container_id=$(docker ps -f name=$service_name -q | tail -n1) && \
-	docker pull $docker_username/$service_name && \
 	sops exec-env encrypted.env 'docker compose -p sidekick up -d --no-deps --scale $service_name=2 --no-recreate $service_name' && \
 	new_container_id=$(docker ps -f name=$service_name -q | head -n1) && \
 	new_container_ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $new_container_id) && \
@@ -65,7 +72,6 @@ var DeployAppWithEnvScript = `
 var DeployAppScript = `
 	cd $service_name && \
 	old_container_id=$(docker ps -f name=$service_name -q | tail -n1) && \
-	docker pull $docker_username/$service_name && \
 	docker compose -p sidekick up -d --no-deps --scale $service_name=2 --no-recreate $service_name && \
 	new_container_id=$(docker ps -f name=$service_name -q | head -n1) && \
 	new_container_ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $new_container_id) && \

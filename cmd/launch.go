@@ -98,8 +98,11 @@ var launchCmd = &cobra.Command{
 		} else {
 			pterm.Info.Println("No env file detected - Skipping env parsing")
 		}
+		fmt.Println("Env is:")
+		fmt.Println(dockerEnvProperty)
+
 		// make a docker service
-		imageName := fmt.Sprintf("%s/%s", viper.Get("dockerUsername").(string), appName)
+		imageName := appName
 		newService := utils.DockerService{
 			Image: imageName,
 			Labels: []string{
@@ -137,8 +140,11 @@ var launchCmd = &cobra.Command{
 		}
 		defer os.Remove("docker-compose.yaml")
 
+		pterm.Println()
+		pterm.DefaultHeader.WithFullWidth().Println("Let's launch your app! 🚀")
+		pterm.Println()
+
 		multi := pterm.DefaultMultiPrinter
-		launchPb, _ := pterm.DefaultProgressbar.WithTotal(3).WithWriter(multi.NewWriter()).Start("Booting up app on VPS")
 		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
 		dockerBuildSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Preparing docker image")
 		setupSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up application")
@@ -152,25 +158,35 @@ var launchCmd = &cobra.Command{
 			panic(err)
 		}
 		loginSpinner.Success("Logged in successfully!")
-		launchPb.Increment()
 
 		dockerBuildSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		cwd, _ := os.Getwd()
-		dockerBuildCommd := exec.Command("sh", "-s", "-", appName, viper.Get("dockerUsername").(string), cwd)
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		dockerBuildCommd := exec.Command("sh", "-s", "-", appName, cwd)
+		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
 		// better handle of errors -> Push it to another writer aside from os.stderr and then flush it when it panics
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			log.Fatalln("Failed to run docker")
 			os.Exit(1)
 		}
-		dockerBuildSpinner.Success("Successfully built and pushed docker image")
-		launchPb.Increment()
-
-		setupSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		_, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 		if sessionErr != nil {
 			panic(sessionErr)
 		}
+
+		imgMoveCmd := exec.Command("sh", "-s", "-", appName, "sidekick", viper.GetString("serverAddress"))
+		imgMoveCmd.Stdin = strings.NewReader(utils.ImageMoveScript)
+		_, imgMoveErr := imgMoveCmd.Output()
+		if imgMoveErr != nil {
+			log.Fatalf("Issue occured with moving image to your VPS: %s", imgMoveErr)
+			os.Exit(1)
+		}
+		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appName, appName)); sessionErr != nil {
+			log.Fatal("Issue happened loading docker image")
+		}
+
+		dockerBuildSpinner.Success("Successfully built and moved docker image to your VPS")
+
+		setupSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 		rsync.Run()
 		if hasEnvFile {
@@ -187,6 +203,9 @@ var launchCmd = &cobra.Command{
 				panic(sessionErr1)
 			}
 		}
+		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appName, fmt.Sprintf("%s-latest.tar", appName))); sessionErr != nil {
+			log.Fatal("Issue happened cleaning up the image file")
+		}
 
 		portNumber, err := strconv.ParseUint(appPort, 0, 64)
 		if err != nil {
@@ -201,7 +220,6 @@ var launchCmd = &cobra.Command{
 		sidekickAppConfig := utils.SidekickAppConfig{
 			Name:      appName,
 			Version:   "V1",
-			Image:     fmt.Sprintf("%s/%s", viper.Get("dockerUsername"), appName),
 			Port:      portNumber,
 			Url:       appDomain,
 			CreatedAt: time.Now().Format(time.UnixDate),
@@ -209,7 +227,6 @@ var launchCmd = &cobra.Command{
 		}
 		ymlData, err := yaml.Marshal(&sidekickAppConfig)
 		os.WriteFile("./sidekick.yml", ymlData, 0644)
-		launchPb.Increment()
 
 		setupSpinner.Success("🙌 App setup successfully 🙌")
 		multi.Stop()

@@ -172,7 +172,7 @@ to quickly create a Cobra application.`,
 		dockerBuildSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		cwd, _ := os.Getwd()
 		dockerBuildCommd := exec.Command("sh", "-s", "-", appName, viper.Get("dockerUsername").(string), cwd)
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerHandleScript)
+		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
 		// better handle of errors -> Push it to another writer aside from os.stderr and then flush it when it panics
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
 			log.Fatalln("Failed to run docker")
@@ -237,7 +237,6 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	rootCmd.AddCommand(composeCmd)
 
 	// Here you will define your flags and configuration settings.
 
