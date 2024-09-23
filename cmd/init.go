@@ -32,7 +32,7 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Init sidekick CLI and configure your VPS to host your apps",
 	Long: `This command will run you throgh the setup steps to get sidekick loaded on your VPS.
-		You wil neede to provide your VPS IPv4 address and a registery to host your docker images.
+		You wil neede to provide your VPS IPv4 address and a registry to host your docker images.
 		`,
 	Run: func(cmd *cobra.Command, args []string) {
 		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")

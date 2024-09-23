@@ -30,12 +30,8 @@ import (
 var envCmd = &cobra.Command{
 	Use:   "env",
 	Short: "Prepare env variable secrets by encrypting them before deployment",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Long: `This command allows you to encrypt sensitive environment variables, such as API keys and database credentials, before deploying your application. 
+These encrypted secrets will be securely stored and used by your application during runtime, ensuring that your sensitive information is not exposed.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		utils.ViperInit()
 		envFile, envFileErr := os.ReadFile("./.env")
