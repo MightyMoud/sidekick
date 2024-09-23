@@ -40,6 +40,12 @@ var launchCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		if utils.FileExists("./sidekick.yml") {
+			pterm.Error.Println("Sidekick config exits in this project.")
+			pterm.Info.Println("You can deploy a new version of your application with Sidekick deploy.")
+			os.Exit(1)
+		}
+
 		if utils.FileExists("./Dockerfile") {
 			pterm.Info.Println("Dockerfile detected - scanning file for details")
 		} else {
@@ -93,13 +99,11 @@ var launchCmd = &cobra.Command{
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
 			hasEnvFile = true
 			pterm.Info.Printfln("Env file detected - Loading env vars from %s", envFileName)
-			utils.HandleEnvFile(envFileName, envVariables, dockerEnvProperty, &envFileChecksum)
+			utils.HandleEnvFile(envFileName, envVariables, &dockerEnvProperty, &envFileChecksum)
 			defer os.Remove("encrypted.env")
 		} else {
 			pterm.Info.Println("No env file detected - Skipping env parsing")
 		}
-		fmt.Println("Env is:")
-		fmt.Println(dockerEnvProperty)
 
 		// make a docker service
 		imageName := appName
