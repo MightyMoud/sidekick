@@ -107,7 +107,7 @@ to quickly create a Cobra application.`,
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
 			hasEnvFile = true
 			pterm.Info.Printfln("Env file detected - Loading env vars from %s", envFileName)
-			res := utils.HandleEnvFile(envFileName, envVariables, dockerEnvProperty, &envFileChecksum)
+			res := utils.HandleEnvFile(envFileName, envVariables, &dockerEnvProperty, &envFileChecksum)
 			fmt.Println(res)
 			fmt.Println(dockerEnvProperty)
 			defer os.Remove("encrypted.env")

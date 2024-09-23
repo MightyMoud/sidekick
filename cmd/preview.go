@@ -93,7 +93,7 @@ to quickly create a Cobra application.`,
 		dockerEnvProperty := []string{}
 		envFileChecksum := ""
 		if appConfig.Env.File != "" {
-			envErr := utils.HandleEnvFile(appConfig.Env.File, envVariables, dockerEnvProperty, &envFileChecksum)
+			envErr := utils.HandleEnvFile(appConfig.Env.File, envVariables, &dockerEnvProperty, &envFileChecksum)
 			if envErr != nil {
 				panic(envErr)
 			}

@@ -277,7 +277,7 @@ func LoadAppConfig() (SidekickAppConfig, error) {
 	return appConfigFile, nil
 }
 
-func HandleEnvFile(envFileName string, envVariables []string, dockerEnvProperty []string, envFileChecksum *string) error {
+func HandleEnvFile(envFileName string, envVariables []string, dockerEnvProperty *[]string, envFileChecksum *string) error {
 	envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", envFileName))
 	if envFileErr != nil {
 		pterm.Error.Println("Unable to process your env file")
@@ -290,7 +290,7 @@ func HandleEnvFile(envFileName string, envVariables []string, dockerEnvProperty 
 	}
 
 	for _, envVar := range envVariables {
-		dockerEnvProperty = append(dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
+		*dockerEnvProperty = append(*dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
 	}
 	// calculate and store the hash of env file to re-encrypt later on when changed
 	*envFileChecksum = fmt.Sprintf("%x", md5.Sum(envFileContent))
