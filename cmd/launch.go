@@ -40,6 +40,12 @@ var launchCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		if utils.FileExists("./sidekick.yml") {
+			pterm.Error.Println("Sidekick config exits in this project.")
+			pterm.Info.Println("You can deploy a new version of your application with Sidekick deploy.")
+			os.Exit(1)
+		}
+
 		if utils.FileExists("./Dockerfile") {
 			pterm.Info.Println("Dockerfile detected - scanning file for details")
 		} else {
