@@ -22,6 +22,7 @@ import (
 
 	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
+	"github.com/joho/godotenv"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,30 +32,51 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Init sidekick CLI and configure your VPS to host your apps",
-	Long: `This command will run you throgh the setup steps to get sidekick loaded on your VPS.
-		You wil neede to provide your VPS IPv4 address and a registery to host your docker images.
-		`,
+	Long: `This command will run you through the setup steps to get sidekick loaded on your VPS.
+		You will need to provide your VPS IPv4 address and a registry to host your docker images.
+		If a .env file is present with the required values, the manual input will be skipped.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
+		pterm.DefaultBasicText.Println("Welcome to Sidekick. We'll now collect some details from you.")
 
 		render.RenderSidekickBig()
 
-		// get server address
-		server := ""
-		serverTextInput := pterm.DefaultInteractiveTextInput
-		serverTextInput.DefaultText = "Please enter the IPv4 Address of your VPS"
-		server, _ = serverTextInput.Show()
+		// Check for .env file and load it if present
+		envPresent := false
+		if err := godotenv.Load(); err == nil {
+			envPresent = true
+			pterm.Info.Println("Found .env file. Using these values:")
+
+			// Print loaded values only if they are present
+			if ipAddress := os.Getenv("IP_ADDRESS"); ipAddress != "" {
+				pterm.Info.Printf("IP Address: %s\n", ipAddress)
+			}
+			if email := os.Getenv("EMAIL"); email != "" {
+				pterm.Info.Printf("Email: %s\n", email)
+			}
+			pterm.Println() // Add an empty line for better readability
+		}
+
+		// Get server address
+		server := os.Getenv("IP_ADDRESS")
+		if !envPresent || server == "" {
+			serverTextInput := pterm.DefaultInteractiveTextInput
+			serverTextInput.DefaultText = "Please enter the IPv4 Address of your VPS"
+			server, _ = serverTextInput.Show()
+		}
 		if !utils.IsValidIPAddress(server) {
 			pterm.Error.Printfln("You entered an incorrect IP Address - %s", server)
 			os.Exit(0)
 		}
 
-		certEmail := ""
-		certEmailTextInput := pterm.DefaultInteractiveTextInput
-		certEmailTextInput.DefaultText = "Please enter an email for use with TLS certs"
-		certEmail, _ = certEmailTextInput.Show()
+		// Get cert email
+		certEmail := os.Getenv("EMAIL")
+		if !envPresent || certEmail == "" {
+			certEmailTextInput := pterm.DefaultInteractiveTextInput
+			certEmailTextInput.DefaultText = "Please enter an email for use with TLS certs"
+			certEmail, _ = certEmailTextInput.Show()
+		}
 		if certEmail == "" {
-			pterm.Error.Println("An email is needed befoer you proceed")
+			pterm.Error.Println("An email is needed before you proceed")
 			os.Exit(0)
 		}
 
