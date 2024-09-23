@@ -16,6 +16,7 @@ Bare metal to production ready in mins; imagine fly.io on your VPS
 </div>
 
 ## Features
+
 - 👍 One command VPS setup (docker, traefik, sops, age)
 - 💻 deploy any application from a dockerfile
 - ✊ Zero downtime deployment
@@ -27,15 +28,18 @@ Bare metal to production ready in mins; imagine fly.io on your VPS
 
 
 ## Motivation
+
 I'm tired of the complexity involved in hosting my side projects. While some platforms, like Fly.io, stand out in the crowded field of Heroku replacements, I believe a simple VPS can be just as effective. That's why I created Sidekick: to make hosting side projects as straightforward, affordable, and production-ready as possible. You'll be surprised how much traffic a $8/month instance on DigitalOcean can handle.
 
 ## Installation
+
 With GO installed on your system you need to run
 ```bash
 go install github.com/mightymoud/sidekick@latest
 ```
 
 ## Usage
+
 Sidekick helps you along all the steps of deployment on your VPS. From basic setup to zero downtime deploys, we got you! ✊
 
 First you need a VPS with Ubuntu LTS. I recommend DigitalOcean. Hetzner also gets very good reviews. You can host your own silicon too. As long as you have a public IP address you can use Sidekick.
@@ -45,6 +49,7 @@ Just make sure the following is true:
 - SSH Public Key available on your machine to login to VPS.
 
 That's it!
+
 ### VPS Setup
 
   <div align="center" >
@@ -53,15 +58,23 @@ That's it!
 
 
 First you need to setup your VPS. To do this you need to run:
+
 ```bash
 sidekick init
 ```
 
-Then you need to enter the following:
+Then you need to enter the following*:
 - IP Address of your VPS
 - An email address to use for setting up SSL certs
 
 After that Sidekick will setup many things on your VPS - Usually takes around 2 mins
+
+> [!NOTE]
+> Alternately, sidekick will also read from an `.env` file in the working directory.
+> 
+> It just needs `IP_ADDRESS` and `EMAIL` to be filled out.
+> 
+> See [.env.example](.env.example).
 
 <details>
   <summary>What does Sidekick do when I run this command</summary>
@@ -88,6 +101,7 @@ Then run:
 ```bash
 sidekick launch
 ```
+
 Then you need to enter the following:
 - Url friendly name of your app - if you opt to use `sslip.io` domain for testing this would be your subdomain
 - HTTP exposed port for your app to get requests - Sidekick will scan your docker file to try to extract this number and default it.
@@ -113,6 +127,7 @@ Should take around 2 more mins to be able to visit your application live on the 
 With your application deployed, it's super simple to redeploy a new version.
 
 At any point any time you need to only run:
+
 ```bash
 sidekick deploy
 ```
@@ -131,6 +146,7 @@ This command will also do a couple of things behind the scenes. You can check th
 </details>
 
 ### Deploy a preview environment
+
   <div align="center" >
     <img width="500px" src="/demo/imgs/preview.png">
   </div>
@@ -140,7 +156,6 @@ Once you have a clean git tree, you can run the following command to deploy a pr
 ```bash
 sidekick deploy preview
 ```
-
 
 <details>
   <summary>What does Sidekick do when I run this command</summary>
@@ -153,13 +168,13 @@ sidekick deploy preview
 * Deploy a new version of your app reachable on a short hash based subdomain
 </details>
 
-
-
 ## Inspiration
+
 - https://fly.io/
 - https://kamal-deploy.org/
 
 ## Vision
+
 Simple CLI tool that can help you:
 - Setup your VPS
 - Deploy all your side projects on a single VPS
@@ -191,7 +206,9 @@ Remove-Item sidekick.exe
 
 ---
 ## Roadmap
+
 I still have a couple more feature I want to add here. Also considering some of those to be on a paid version.
+
 - Preview env deployments
 - A way to deploy more complicated projects defined in docker compose file
 - Better zero downtime deploys with watchtower
