@@ -34,7 +34,7 @@ import (
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy a new version of your application to your VPS using Sidekick",
-	Long: `This command deploys a new version o your application to your VPS. 
+	Long: `This command deploys a new version of your application to your VPS. 
 It assumes that your VPS is already configured and that your application is ready for deployment`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if configErr := utils.ViperInit(); configErr != nil {
