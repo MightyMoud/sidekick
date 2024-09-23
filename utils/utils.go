@@ -71,7 +71,7 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 	// connect to local ssh-agent to grab all keys
 	sshAgentSock := os.Getenv("SSH_AUTH_SOCK")
 	if sshAgentSock == "" {
-		log.Fatal("No SSH SOCK AVAIBALEB")
+		log.Fatal("No SSH SOCK AVAILABLE")
 		return nil, errors.New("Error happened connecting to ssh-agent")
 	}
 	// make a connection to SSH agent over unix protocl
