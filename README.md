@@ -30,7 +30,12 @@ Bare metal to production ready in mins; imagine fly.io on your VPS
 I'm tired of the complexity involved in hosting my side projects. While some platforms, like Fly.io, stand out in the crowded field of Heroku replacements, I believe a simple VPS can be just as effective. That's why I created Sidekick: to make hosting side projects as straightforward, affordable, and production-ready as possible. You'll be surprised how much traffic a $8/month instance on DigitalOcean can handle.
 
 ## Installation
-With GO installed on your system you need to run
+
+On a Mac:
+```bash
+brew install sidekick
+```
+Linux/Windows you need GO installed on your system then you need to run:
 ```bash
 go install github.com/mightymoud/sidekick@latest
 ```
