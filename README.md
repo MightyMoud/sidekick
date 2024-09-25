@@ -91,6 +91,15 @@ After that Sidekick will setup many things on your VPS - Usually takes around 2 
 * Setup Traefik and SSL certs on your VPS
 </details>
 
+<details>
+  <summary><strong>If you are on a Mac make sure to:</strong></summary>
+  
+* Run `ssh-add --apple-use-keychain ~/.ssh/YOUR_KEY` first before running this command.
+
+This will be fixed soon in our next release where Sidekick will check the default key before grabbing the keys from the ssh agent.
+
+</details>
+
 ### Launch a new application
 
   <div align="center" >
