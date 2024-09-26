@@ -111,7 +111,7 @@ Run sidekick launch`)
 		imgMoveCmd.Stdin = strings.NewReader(utils.ImageMoveScript)
 		_, imgMoveErr := imgMoveCmd.Output()
 		if imgMoveErr != nil {
-			log.Fatalf("Issue occured with moving image to your VPS: %s", imgMoveErr)
+			log.Fatalf("Issue occurred with moving image to your VPS: %s", imgMoveErr)
 			os.Exit(1)
 		}
 		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appConfig.Name, appConfig.Name)); sessionErr != nil {
