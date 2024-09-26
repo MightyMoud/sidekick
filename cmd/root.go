@@ -23,7 +23,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "sidekick",
-	Short: "CLI to self-host all your apps on a sinlge VPS without vendor locking",
+	Short: "CLI to self-host all your apps on a single VPS without vendor locking",
 	Long:  `With sidekick you can deploy any number of applications to a single VPS, connect multiple domains and much more.`,
 }
 
