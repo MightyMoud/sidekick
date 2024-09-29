@@ -31,8 +31,8 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Init sidekick CLI and configure your VPS to host your apps",
-	Long: `This command will run you throgh the setup steps to get sidekick loaded on your VPS.
-		You wil neede to provide your VPS IPv4 address and a registry to host your docker images.
+	Long: `This command will run you through the setup steps to get sidekick loaded on your VPS.
+		You wil need to provide your VPS IPv4 address and a registry to host your docker images.
 		`,
 	Run: func(cmd *cobra.Command, args []string) {
 		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
@@ -54,7 +54,7 @@ var initCmd = &cobra.Command{
 		certEmailTextInput.DefaultText = "Please enter an email for use with TLS certs"
 		certEmail, _ = certEmailTextInput.Show()
 		if certEmail == "" {
-			pterm.Error.Println("An email is needed befoer you proceed")
+			pterm.Error.Println("An email is needed before you proceed")
 			os.Exit(0)
 		}
 
