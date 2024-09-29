@@ -83,11 +83,13 @@ After that Sidekick will setup many things on your VPS - Usually takes around 2 
 * Login with `root` user
 * Make a new user `sidekick` and grant sudo access
 * Logout from `root` and login with `sidekick`
+* Disable login with `root` user - security best practice
 * Update and upgrade your Ubuntu system
 * Install `sops` and copy over the public key to your sidekick config file
 * Use `age` to make secret and public keys to use later for encrypting env file.
 * Send public key back to host machine to be used later for encryption
 * Install Docker
+* Add user sidekick to docker group
 * Setup Traefik and SSL certs on your VPS
 </details>
 
