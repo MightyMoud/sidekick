@@ -15,9 +15,9 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/mightymoud/sidekick/render"
@@ -38,37 +38,29 @@ var initCmd = &cobra.Command{
 		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
 
 		render.RenderSidekickBig()
+		server := viper.GetString("serverAddress")
+		certEmail := viper.GetString("certEmail")
 
-		// get server address
-		server := ""
-		serverTextInput := pterm.DefaultInteractiveTextInput
-		serverTextInput.DefaultText = "Please enter the IPv4 Address of your VPS"
-		server, _ = serverTextInput.Show()
-		if !utils.IsValidIPAddress(server) {
-			pterm.Error.Printfln("You entered an incorrect IP Address - %s", server)
-			os.Exit(0)
+		if server == "" {
+			serverTextInput := pterm.DefaultInteractiveTextInput
+			serverTextInput.DefaultText = "Please enter the IPv4 Address of your VPS"
+			server, _ = serverTextInput.Show()
+			if !utils.IsValidIPAddress(server) {
+				pterm.Error.Printfln("You entered an incorrect IP Address - %s", server)
+				os.Exit(0)
+			}
 		}
 
-		certEmail := ""
-		certEmailTextInput := pterm.DefaultInteractiveTextInput
-		certEmailTextInput.DefaultText = "Please enter an email for use with TLS certs"
-		certEmail, _ = certEmailTextInput.Show()
 		if certEmail == "" {
-			pterm.Error.Println("An email is needed before you proceed")
-			os.Exit(0)
+			certEmailTextInput := pterm.DefaultInteractiveTextInput
+			certEmailTextInput.DefaultText = "Please enter an email for use with TLS certs"
+			certEmail, _ = certEmailTextInput.Show()
+			if certEmail == "" {
+				pterm.Error.Println("An email is needed before you proceed")
+				os.Exit(0)
+			}
 		}
 
-		// init the sidekick system config && add public key to known_hosts
-		preludeCmd := exec.Command("sh", "-s", "-")
-		preludeCmd.Stdin = strings.NewReader(utils.PreludeScript)
-		if preludeCmdErr := preludeCmd.Run(); preludeCmdErr != nil {
-			panic(preludeCmdErr)
-		}
-
-		// setup viper for config
-		viper.SetConfigName("default")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("$HOME/.config/sidekick/")
 		viper.Set("serverAddress", server)
 		viper.Set("certEmail", certEmail)
 
@@ -125,7 +117,6 @@ var initCmd = &cobra.Command{
 			if strings.HasPrefix(output, "Public key") {
 				publicKey := strings.Split(output, " ")[2:3]
 				viper.Set("publicKey", publicKey[0])
-				viper.WriteConfig()
 			}
 		}
 		stage1Spinner.Success(utils.SetupStage.SpinnerSuccessMessage)
@@ -157,6 +148,39 @@ var initCmd = &cobra.Command{
 	},
 }
 
+func initConfig() {
+	home, err := os.UserHomeDir()
+	cobra.CheckErr(err)
+
+	configPath := fmt.Sprintf("%s/.config/sidekick", home)
+	configFile := fmt.Sprintf("%s/default.yaml", configPath)
+
+	makeDirErr := os.MkdirAll(configPath, os.ModePerm)
+	if makeDirErr != nil {
+		log.Fatalf("Error creating directory: %v\n", makeDirErr)
+		os.Exit(1)
+	}
+
+	viper.AddConfigPath(configPath)
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("default")
+	file, fileCreateErr := os.Create(configFile)
+	if fileCreateErr != nil {
+		log.Fatalf("Error creating configFile: %v\n", fileCreateErr)
+		os.Exit(1)
+
+	}
+	file.Close()
+
+}
+
 func init() {
 	rootCmd.AddCommand(initCmd)
+	cobra.OnInitialize(initConfig)
+
+	initCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
+	viper.BindPFlag("serverAddress", initCmd.Flags().Lookup("server"))
+
+	initCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
+	viper.BindPFlag("certEmail", initCmd.Flags().Lookup("email"))
 }

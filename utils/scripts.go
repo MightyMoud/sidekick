@@ -20,15 +20,6 @@ var sshKeyScript = `
 		echo "$publicKey" | ssh-keygen -lvf /dev/stdin 
 	`
 
-var PreludeScript = `
-	mkdir -p $HOME/.config/sidekick
-
-	CONFIG_FILE="$HOME/.config/sidekick/default.yaml"
-	if [ ! -e "$CONFIG_FILE" ]; then
-	    touch "$CONFIG_FILE"
-	fi
-	`
-
 var ImageMoveScript = `
 	appName=$1
 	user=$2
