@@ -35,6 +35,7 @@ var initCmd = &cobra.Command{
 		You wil need to provide your VPS IPv4 address and a registry to host your docker images.
 		`,
 	Run: func(cmd *cobra.Command, args []string) {
+		initConfig()
 		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
 
 		render.RenderSidekickBig()
@@ -168,15 +169,13 @@ func initConfig() {
 	if fileCreateErr != nil {
 		log.Fatalf("Error creating configFile: %v\n", fileCreateErr)
 		os.Exit(1)
-
 	}
-	file.Close()
 
+	file.Close()
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-	cobra.OnInitialize(initConfig)
 
 	initCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
 	viper.BindPFlag("serverAddress", initCmd.Flags().Lookup("server"))
