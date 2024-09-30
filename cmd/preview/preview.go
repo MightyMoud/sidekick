@@ -15,6 +15,7 @@ limitations under the License.
 package preview
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -135,11 +136,12 @@ var PreviewCmd = &cobra.Command{
 		defer os.Remove("docker-compose.yaml")
 
 		cwd, _ := os.Getwd()
+		var stdErrBuff bytes.Buffer
 		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, cwd, deployHash)
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
-		// better handle of errors -> Push it to another writer aside from os.stderr and then flush it when it panics
+		dockerBuildCommd.Stderr = &stdErrBuff
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
-			log.Fatalln("Failed to run docker")
+			pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
 			os.Exit(1)
 		}
 
@@ -185,9 +187,7 @@ var PreviewCmd = &cobra.Command{
 			Image:     imageName,
 			CreatedAt: time.Now().Format(time.UnixDate),
 		}
-		appConfig.PreviewEnvs = map[string]utils.SidekickPreview{
-			deployHash: previewEnvConfig,
-		}
+		appConfig.PreviewEnvs[deployHash] = previewEnvConfig
 
 		ymlData, _ := yaml.Marshal(&appConfig)
 		os.WriteFile("./sidekick.yml", ymlData, 0644)

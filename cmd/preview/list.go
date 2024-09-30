@@ -15,8 +15,11 @@ limitations under the License.
 package preview
 
 import (
-	"fmt"
+	"log"
+	"os"
 
+	"github.com/mightymoud/sidekick/utils"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +30,21 @@ var listCmd = &cobra.Command{
 	Short:   "This command lists all the preview environments",
 	Long:    `This command lists all the preview environments that are currently running on your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("list called")
+		pterm.Println()
+		appConfig, appConfigErr := utils.LoadAppConfig()
+		if appConfigErr != nil {
+			log.Fatalln("Unable to load your config file. Might be corrupted")
+			os.Exit(1)
+		}
+		tableData := pterm.TableData{
+			{"Commit", "Image", "Deployed at", "URL"},
+		}
+		for v := range appConfig.PreviewEnvs {
+			tableData = append(tableData, []string{v, appConfig.PreviewEnvs[v].Image, appConfig.PreviewEnvs[v].CreatedAt, appConfig.PreviewEnvs[v].Url})
+		}
+
+		pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(tableData).Render()
+
+		pterm.Println()
 	},
 }

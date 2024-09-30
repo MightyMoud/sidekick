@@ -15,6 +15,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -165,11 +166,12 @@ var launchCmd = &cobra.Command{
 
 		dockerBuildSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		cwd, _ := os.Getwd()
+		var stdErrBuff bytes.Buffer
 		dockerBuildCommd := exec.Command("sh", "-s", "-", appName, cwd)
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
-		// better handle of errors -> Push it to another writer aside from os.stderr and then flush it when it panics
-		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
-			log.Fatalln("Failed to run docker")
+		dockerBuildCommd.Stderr = &stdErrBuff
+		if _, dockerBuildErr := dockerBuildCommd.Output(); dockerBuildErr != nil {
+			pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
 			os.Exit(1)
 		}
 		_, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))

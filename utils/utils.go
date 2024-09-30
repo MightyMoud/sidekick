@@ -268,7 +268,7 @@ func ViperInit() error {
 
 func LoadAppConfig() (SidekickAppConfig, error) {
 	if !FileExists("./sidekick.yml") {
-		log.Fatalln("Sidekick app config not found. Please run sidekick init first")
+		pterm.Error.Println("Sidekick app config not found. Please run sidekick launch first")
 		os.Exit(1)
 	}
 	appConfigFile := SidekickAppConfig{}

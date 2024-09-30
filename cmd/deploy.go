@@ -15,6 +15,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
 	"log"
@@ -99,10 +100,13 @@ Run sidekick launch`)
 		defer os.Remove("encrypted.env")
 
 		cwd, _ := os.Getwd()
+		var stdErrBuff bytes.Buffer
 		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, cwd)
 		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
+		dockerBuildCommd.Stderr = &stdErrBuff
 		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
-			panic(dockerBuildErr)
+			pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
+			os.Exit(1)
 		}
 		dockerBuildStageSpinner.Success("Latest docker image built")
 
