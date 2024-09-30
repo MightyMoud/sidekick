@@ -19,22 +19,21 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"github.com/skeema/knownhosts"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
 	"strings"
-
 	"time"
 
 	"github.com/pterm/pterm"
+	"github.com/skeema/knownhosts"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"os/user"
-
 	"gopkg.in/yaml.v3"
 )
 
@@ -248,12 +247,21 @@ func FileExists(filename string) bool {
 }
 
 func ViperInit() error {
-	viper.SetConfigName("default")
+	home, err := os.UserHomeDir()
+	cobra.CheckErr(err)
+
+	configPath := fmt.Sprintf("%s/.config/sidekick", home)
+
+	viper.AddConfigPath(configPath)
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath("$HOME/.config/sidekick/")
-	err := viper.ReadInConfig()
+	viper.SetConfigName("default")
+	err = viper.ReadInConfig()
 	if err != nil {
 		return fmt.Errorf("Fatal error config file: %w", err)
+	}
+	server := viper.GetString("serverAddress")
+	if server == "" {
+		return errors.New("Sidekick config not found. Please run sidekick init.")
 	}
 	return nil
 }

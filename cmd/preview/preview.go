@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package preview
 
 import (
 	"fmt"
@@ -29,18 +29,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-/*
-DEPRECATED
-*/
-var previewCmd = &cobra.Command{
+var PreviewCmd = &cobra.Command{
 	Use:   "preview",
 	Short: "Deploy a preview environment for your application",
 	Long:  `Sidekick allows you to deploy preview environment based on commit hash`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// This file is will be removed in future releases. Use the preview package instead.
-		pterm.Warning.Prefix.Text = "DEPRECATED"
-		pterm.Warning.Println("This command is now deprecated and will be removed in future release. Please use sidekick preview instead.")
-
 		if configErr := utils.ViperInit(); configErr != nil {
 			pterm.Error.Println("Sidekick config not found - Run sidekick init")
 			os.Exit(1)
@@ -196,7 +189,7 @@ var previewCmd = &cobra.Command{
 			deployHash: previewEnvConfig,
 		}
 
-		ymlData, err := yaml.Marshal(&appConfig)
+		ymlData, _ := yaml.Marshal(&appConfig)
 		os.WriteFile("./sidekick.yml", ymlData, 0644)
 
 		deployStageSpinner.Success("Successfully built and pushed docker image")
@@ -210,5 +203,5 @@ var previewCmd = &cobra.Command{
 }
 
 func init() {
-	deployCmd.AddCommand(previewCmd)
+	PreviewCmd.AddCommand(listCmd)
 }

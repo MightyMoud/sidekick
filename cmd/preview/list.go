@@ -12,29 +12,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package preview
 
 import (
-	"os"
+	"fmt"
 
-	"github.com/mightymoud/sidekick/cmd/preview"
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "sidekick",
-	Short: "CLI to self-host all your apps on a single VPS without vendor locking",
-	Long:  `With sidekick you can deploy any number of applications to a single VPS, connect multiple domains and much more.`,
-}
-
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
-}
-
-func init() {
-	rootCmd.AddCommand(preview.PreviewCmd)
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+// listCmd represents the list command
+var listCmd = &cobra.Command{
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "This command lists all the preview environments",
+	Long:    `This command lists all the preview environments that are currently running on your VPS.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("list called")
+	},
 }

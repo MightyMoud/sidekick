@@ -36,7 +36,7 @@ var launchCmd = &cobra.Command{
 	Long:  `This command will run you through the basic setup to add a new application to your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if configErr := utils.ViperInit(); configErr != nil {
-			pterm.Error.Println("Sidekick config not found - Run sidekick init")
+			pterm.Error.Println(configErr)
 			os.Exit(1)
 		}
 

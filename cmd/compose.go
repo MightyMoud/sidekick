@@ -1,5 +1,16 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+
+Licensed under the GNU GPL License, Version 3.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+https://www.gnu.org/licenses/gpl-3.0.en.html
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 package cmd
 
@@ -19,7 +30,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// composeCmd represents the compose command
+/*
+This file is just a scratchpad for my thoughts.
+Please ignore this file.
+No I don't know how to use branches.
+Send Help.
+*/
+
 var composeCmd = &cobra.Command{
 	Use:   "compose",
 	Short: "A brief description of your command",
