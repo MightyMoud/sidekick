@@ -21,7 +21,7 @@ import (
 var stagedSpinner = pterm.DefaultSpinner
 
 func GetSpinner() pterm.SpinnerPrinter {
-	stagedSpinner.Sequence = []string{"."}
-	stagedSpinner.ShowTimer = false
+	// stagedSpinner.Sequence = []string{"."}
+	// stagedSpinner.ShowTimer = false
 	return stagedSpinner
 }
