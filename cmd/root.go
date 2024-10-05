@@ -21,10 +21,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "sidekick",
-	Short: "CLI to self-host all your apps on a single VPS without vendor locking",
-	Long:  `With sidekick you can deploy any number of applications to a single VPS, connect multiple domains and much more.`,
+	Use:     "sidekick",
+	Version: version,
+	Short:   "CLI to self-host all your apps on a single VPS without vendor locking",
+	Long:    `With sidekick you can deploy any number of applications to a single VPS, connect multiple domains and much more.`,
 }
 
 func Execute() {
@@ -35,6 +38,6 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.SetVersionTemplate(`{{println .Version}}`)
 	rootCmd.AddCommand(preview.PreviewCmd)
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
