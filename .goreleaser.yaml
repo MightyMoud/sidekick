@@ -14,10 +14,10 @@ before:
     - go mod tidy
 
 builds:
-  - ldflags:
-    - "-X 'github.com/mightymoud/sidekick/cmd.version={{.Tag}}'"
   - env:
       - CGO_ENABLED=0
+    ldflags:
+      - "-X 'github.com/mightymoud/sidekick/cmd.version={{.Tag}}'"
     goos:
       - linux
       - windows
@@ -44,3 +44,4 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+      - "^chore:"
