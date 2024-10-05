@@ -33,16 +33,10 @@ I'm tired of the complexity involved in hosting my side projects. While some pla
 
 ## Installation
 
-On a Mac:
+Using brew:
 
 ```bash
 brew install sidekick
-```
-
-Linux/Windows you need GO installed on your system then you need to run:
-
-```bash
-go install github.com/mightymoud/sidekick@latest
 ```
 
 ## Usage
