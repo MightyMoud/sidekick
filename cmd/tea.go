@@ -9,15 +9,36 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mightymoud/sidekick/utils"
 	"github.com/spf13/cobra"
 )
+
+type logMsg struct {
+	LogLine string
+}
+type setStateMsg struct {
+	ActiveIndex int
+}
+
+type stage struct {
+	Title   string
+	Success string
+	Spinner spinner.Model
+	Logs    []string
+}
+
+type deployModel struct {
+	tea.Model
+	ActiveIndex    int
+	Stages         []stage
+	Quitting       bool
+	ViewportWidth  int
+	ViewportHeight int
+}
 
 // teaCmd represents the tea command
 var teaCmd = &cobra.Command{
@@ -30,35 +51,24 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		s := spinner.New()
-		s.Style = spinnerStyle
-		s.Spinner = spinner.Jump
 
-		logs := make([]string, 5)
-		logs = append(logs, "")
-
-		logs2 := make([]string, 5)
-		logs2 = append(logs2, "")
-
-		cmdStages := map[string]stage{
-			"login": {
-				Spinner: s,
-				Title:   "Logining in yo",
-				Logs:    logs,
-			},
-			"second": {
-				Spinner: s,
-				Title:   "Second stage man",
-				Logs:    logs2,
-			},
+		cmdStages := []stage{
+			makeStage("Logging in to your server", "Logged in successfully"),
+			makeStage("Doing something", "We did it"),
 		}
+
 		p := tea.NewProgram(newModel(cmdStages))
-		cwd, _ := os.Getwd()
+		// cwd, _ := os.Getwd()
+		// f, err := os.Create("my_stderr.log")
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+		// defer f.Close()
 		// var stdErrBuff bytes.Buffer
-		dockerBuildCommd := exec.Command("sh", "-s", "-", "app", cwd, "latest")
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
+		dockerBuildCommd := exec.Command("docker", "build", "--tag", "app", ".")
+		// dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
 		secCommand := exec.Command("pwd")
-		// dockerBuildCommd.Stderr = &stdErrBuff
+
 		// p, _ := dockerBuildCommd.StdoutPipe()
 		e, _ := dockerBuildCommd.StderrPipe()
 		y, _ := secCommand.StdoutPipe()
@@ -67,12 +77,15 @@ to quickly create a Cobra application.`,
 			reader := bufio.NewReader(e)
 			for {
 				line, err := reader.ReadString('\n')
+
 				if err != nil {
 					if err == io.EOF {
 						break
 					}
 				}
-				p.Send(LogMsg{Stage: "login", LogLine: line})
+				if line != "\n" {
+					p.Send(logMsg{LogLine: line})
+				}
 			}
 		}()
 
@@ -85,7 +98,7 @@ to quickly create a Cobra application.`,
 						break
 					}
 				}
-				p.Send(LogMsg{Stage: "second", LogLine: line})
+				p.Send(logMsg{LogLine: line})
 			}
 		}()
 
@@ -95,7 +108,7 @@ to quickly create a Cobra application.`,
 				// os.Exit(1)
 			}
 			time.Sleep(time.Millisecond * 2000)
-			p.Send(SetStateMsg{ActiveStage: "second"})
+			p.Send(setStateMsg{ActiveIndex: 1})
 			time.Sleep(time.Millisecond * 2000)
 			if secCommandErr := secCommand.Run(); secCommandErr != nil {
 				// pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
@@ -112,65 +125,52 @@ to quickly create a Cobra application.`,
 	},
 }
 
+func init() {
+	rootCmd.AddCommand(teaCmd)
+
+}
+
 var (
-	spinnerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("150"))
-	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Margin(1, 0)
-	dotStyle      = helpStyle.UnsetMargins()
-	durationStyle = dotStyle
-	appStyle      = lipgloss.NewStyle().Margin(1, 2, 0, 2)
+	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).MarginRight(1)
+	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575"))
+	cancelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Faint(true)
+	pendingStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	appStyle     = lipgloss.NewStyle()
 )
 
-func getLogContainerStyle(m model) lipgloss.Style {
+func getLogContainerStyle(m deployModel) lipgloss.Style {
 	return lipgloss.
 		NewStyle().
 		Width(int(0.8 * float64(m.ViewportWidth))).
 		Height(0).
-		PaddingLeft(1).
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("69"))
-
+		BorderForeground(lipgloss.Color("69")).
+		Foreground(lipgloss.Color("white")).Faint(true)
+}
+func getBannerStyle(m deployModel) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("white")).
+		Background(lipgloss.Color("#414868")).
+		Width(m.ViewportWidth).
+		Padding(1).
+		Align(lipgloss.Center).
+		MarginBottom(1).
+		MarginTop(1)
 }
 
-type LogMsg struct {
-	Stage   string
-	LogLine string
-}
-type SetStateMsg struct {
-	ActiveStage string
-}
-
-type stage struct {
-	Title   string
-	Spinner spinner.Model
-	Logs    []string
-}
-
-type model struct {
-	ActiveStage    string
-	Stages         map[string]stage
-	Quitting       bool
-	ViewportWidth  int
-	ViewportHeight int
-}
-
-func newModel(cmdStages map[string]stage) model {
-	const logsDepth = 5
-	s := spinner.New()
-	s.Spinner = spinner.Jump
-	s.Style = spinnerStyle
-
-	return model{
+func newModel(cmdStages []stage) deployModel {
+	return deployModel{
 		Stages:      cmdStages,
-		ActiveStage: "login",
+		ActiveIndex: 0,
 		Quitting:    false,
 	}
 }
 
-func (m model) Init() tea.Cmd {
-	return m.Stages[m.ActiveStage].Spinner.Tick
+func (m deployModel) Init() tea.Cmd {
+	return m.Stages[m.ActiveIndex].Spinner.Tick
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m deployModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		m.Quitting = true
@@ -180,56 +180,58 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ViewportWidth = msg.Width
 		return m, nil
 
-	case LogMsg:
-		logStage := m.Stages[msg.Stage]
+	case logMsg:
+		logStage := m.Stages[m.ActiveIndex]
 		logStage.Logs = append(logStage.Logs[1:], msg.LogLine)
-		m.Stages[msg.Stage] = logStage
+		m.Stages[m.ActiveIndex] = logStage
 
 		return m, nil
 
-	case SetStateMsg:
-		m.ActiveStage = msg.ActiveStage
+	case setStateMsg:
+		m.ActiveIndex = msg.ActiveIndex
 
-		return m, nil
+		return m, m.Stages[m.ActiveIndex].Spinner.Tick
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
-		stage := m.Stages[m.ActiveStage]
-		spinnerTarget := stage.Spinner
-		spinnerTarget, cmd = spinnerTarget.Update(msg)
-		stage.Spinner = spinnerTarget
-		m.Stages[m.ActiveStage] = stage
+		m.Stages[m.ActiveIndex].Spinner, cmd = m.Stages[m.ActiveIndex].Spinner.Update(msg)
 		return m, cmd
 	default:
 		return m, nil
 	}
 }
 
-func (m model) View() string {
+func (m deployModel) View() string {
 	var s string
+	printSlice := []string{}
 
-	if m.Quitting {
-		s += "That’s all for today!"
-	}
+	printSlice = append(printSlice, getBannerStyle(m).Render("Deploying a new version of your app 😏"))
 
 	var logs string
-	for _, res := range m.Stages[m.ActiveStage].Logs {
+	for _, res := range m.Stages[m.ActiveIndex].Logs {
 		logs += res
 	}
 
-	printSlice := []string{}
-	for name, stage := range m.Stages {
-		printSlice = append(printSlice, stage.Spinner.View()+stage.Title)
-		if name == m.ActiveStage {
-			printSlice = append(printSlice, getLogContainerStyle(m).Render(m.Stages[m.ActiveStage].Logs...))
+	for index, stage := range m.Stages {
+		if index < m.ActiveIndex {
+			printSlice = append(printSlice, successStyle.Render("✔ "+stage.Success))
+		} else if index == m.ActiveIndex {
+			printSlice = append(printSlice, stage.Spinner.View()+stage.Title)
+			printSlice = append(printSlice, getLogContainerStyle(m).Render(stage.Logs...))
+		} else if index > m.ActiveIndex {
+			var text string
+			if m.Quitting {
+				text = cancelStyle.Render("CANCELLED " + stage.Title)
+			} else {
+				text = pendingStyle.Render("󰚭 " + stage.Title)
+			}
+			printSlice = append(printSlice, pendingStyle.Render(text))
 		}
 	}
 
 	s += lipgloss.JoinVertical(lipgloss.Top, printSlice...)
 
-	if !m.Quitting {
-		s += helpStyle.Render("Press any key to exit")
-	}
+	s += "\n"
 
 	if m.Quitting {
 		s += "\n"
@@ -238,16 +240,18 @@ func (m model) View() string {
 	return appStyle.Render(s)
 }
 
-func init() {
-	rootCmd.AddCommand(teaCmd)
+func makeStage(title string, success string) stage {
+	s := spinner.New()
+	s.Style = spinnerStyle
+	s.Spinner = spinner.MiniDot
 
-	// Here you will define your flags and configuration settings.
+	logs := make([]string, 5)
+	logs = append(logs, "")
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// teaCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// teaCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	return stage{
+		Spinner: s,
+		Title:   title,
+		Success: success,
+		Logs:    logs,
+	}
 }

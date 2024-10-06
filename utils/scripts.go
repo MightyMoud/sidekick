@@ -36,7 +36,7 @@ var DockerBuildAndSaveScript = `
 	projectFolder=$2
 	tag=${3:-"latest"}
 
-	docker build --cache-from=$appName:latest --tag $appName:$tag --platform linux/amd64 $projectFolder 
+	docker build --tag $appName:$tag --progress=plain --platform linux/amd64 $projectFolder 
 
 	docker save -o $appName-$tag.tar $appName
 	`
