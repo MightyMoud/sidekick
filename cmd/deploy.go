@@ -15,67 +15,107 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
+	"bufio"
 	"crypto/md5"
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
-// deployCmd represents the deploy command
+type logMsg struct {
+	LogLine string
+}
+
+type errorMsg struct {
+	ErrorStr string
+}
+type setStateMsg struct {
+	ActiveIndex int
+}
+
+type stage struct {
+	Title    string
+	Success  string
+	Spinner  spinner.Model
+	Logs     []string
+	HasLogs  bool
+	HasError bool
+}
+
+type deployModel struct {
+	tea.Model
+	ActiveIndex    int
+	Stages         []stage
+	Quitting       bool
+	ViewportWidth  int
+	ViewportHeight int
+}
+
+func sendLogsToTUI(source io.ReadCloser, p *tea.Program) {
+	reader := bufio.NewReader(source)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		if line != "\n" {
+			p.Send(logMsg{LogLine: line})
+		}
+	}
+}
+
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy a new version of your application to your VPS using Sidekick",
 	Long: `This command deploys a new version of your application to your VPS. 
 It assumes that your VPS is already configured and that your application is ready for deployment`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if configErr := utils.ViperInit(); configErr != nil {
-			pterm.Error.Println("Sidekick config not found - Run sidekick init")
-			os.Exit(1)
-		}
-		if !utils.FileExists("./sidekick.yml") {
-			pterm.Error.Println(`Sidekick config not found in current directory 
-Run sidekick launch`)
-			os.Exit(1)
-		}
-		pterm.Println()
-		pterm.DefaultHeader.WithFullWidth().Println("Deploying a new version of your app 😏")
-		pterm.Println()
+		// if configErr := utils.ViperInit(); configErr != nil {
+		// 	pterm.Error.Println("Sidekick config not found - Run sidekick init")
+		// 	os.Exit(1)
+		// }
+		// if !utils.FileExists("./sidekick.yml") {
+		// 	pterm.Error.Println(`Sidekick config not found in current directory Run sidekick launch`)
+		// 	os.Exit(1)
+		// }
 
-		multi := pterm.DefaultMultiPrinter
-		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
-		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
-		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a new version of your application")
-
-		multi.Start()
+		cmdStages := []stage{
+			makeStage("Building latest docker image of your app", "Latest docker image built", true),
+			makeStage("Saving docker image locally", "Image saved successfully", false),
+			makeStage("Moving image to your server", "Image moved and loaded successfully", false),
+			makeStage("Deploying a new version of your application", "🙌 Deployed new version successfully 🙌", false),
+		}
+		p := tea.NewProgram(newModel(cmdStages))
 
 		appConfig, loadError := utils.LoadAppConfig()
 		if loadError != nil {
 			panic(loadError)
 		}
-		replacer := strings.NewReplacer(
-			"$service_name", appConfig.Name,
-			"$app_port", fmt.Sprint(appConfig.Port),
-		)
+		// replacer := strings.NewReplacer(
+		// 	"$service_name", appConfig.Name,
+		// 	"$app_port", fmt.Sprint(appConfig.Port),
+		// )
 
-		loginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
-		if err != nil {
-			loginSpinner.Fail("Something went wrong logging in to your VPS")
-			panic(err)
-		}
-		loginSpinner.Success("Logged in successfully!")
+		// sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
+		// if err != nil {
+		// 	// loginSpinner.Fail("Something went wrong logging in to your VPS")
+		// 	panic(err)
+		// }
 
-		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
 		envFileChanged := false
 		currentEnvFileHash := ""
 		if appConfig.Env.File != "" {
@@ -99,65 +139,280 @@ Run sidekick launch`)
 		}
 		defer os.Remove("encrypted.env")
 
-		cwd, _ := os.Getwd()
-		var stdErrBuff bytes.Buffer
-		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, cwd)
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
-		dockerBuildCommd.Stderr = &stdErrBuff
-		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
-			pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
+		go func() {
+			cwd, _ := os.Getwd()
+			imgFileName := fmt.Sprintf("%s-latest.tar", appConfig.Name)
+			dockerBuildCmd := exec.Command("docker", "build", "--tag", imgFileName, "--progress=plain", "--platform=linux/amd64", cwd)
+			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
+			go sendLogsToTUI(dockerBuildCmdErrPipe, p)
+
+			if dockerBuildErr := dockerBuildCmd.Run(); dockerBuildErr != nil {
+				p.Send(errorMsg{})
+			}
+
+			time.Sleep(time.Millisecond * 1000)
+
+			p.Send(setStateMsg{ActiveIndex: 1})
+
+			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appConfig.Name)
+			errChan := make(chan string)
+			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
+
+			go func() {
+				reader := bufio.NewReader(imgSaveCmdErrPipe)
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						if err == io.EOF {
+							break
+						}
+					}
+					if line != "\n" {
+						p.Send(logMsg{LogLine: line})
+						errChan <- line
+					}
+				}
+			}()
+
+			if imgSaveCmdErr := imgSaveCmd.Run(); imgSaveCmdErr != nil {
+				p.Send(errorMsg{})
+			}
+
+			time.Sleep(time.Millisecond * 1000)
+
+			p.Send(setStateMsg{ActiveIndex: 2})
+
+			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appConfig.Name)
+			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
+			imgMoveCmdErrChan := make(chan string)
+			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
+
+			go func() {
+				reader := bufio.NewReader(imgMoveCmdErrorPipe)
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						if err == io.EOF {
+							break
+						}
+					}
+					if line != "\n" {
+						p.Send(logMsg{LogLine: line})
+						imgMoveCmdErrChan <- line
+					}
+				}
+			}()
+			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
+				p.Send(errorMsg{})
+			}
+
+			os.Remove(imgFileName)
+			time.Sleep(time.Millisecond * 1000)
+			p.Send(setStateMsg{ActiveIndex: 3})
+
+			// if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appConfig.Name, appConfig.Name)); sessionErr != nil {
+			// 	log.Fatal("Issue happened loading docker image")
+			// }
+
+			// if appConfig.Env.File != "" {
+			// 	deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
+			// 	_, sessionErr := utils.RunCommand(sshClient, deployScript)
+			// 	if sessionErr != nil {
+			// 		panic(sessionErr)
+			// 	}
+			// } else {
+			// 	deployScript := replacer.Replace(utils.DeployAppScript)
+			// 	_, sessionErr := utils.RunCommand(sshClient, deployScript)
+			// 	if sessionErr != nil {
+			// 		panic(sessionErr)
+			// 	}
+			// }
+			// if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-latest.tar", appConfig.Name))); sessionErr != nil {
+			// 	log.Fatal("Issue happened cleaning up the image file")
+			// }
+
+			// latestVersion := strings.Split(appConfig.Version, "")[1]
+			// latestVersionInt, _ := strconv.ParseInt(latestVersion, 0, 64)
+			// appConfig.Version = fmt.Sprintf("V%d", latestVersionInt+1)
+			// // env file changed ? -> update hash
+			// if envFileChanged {
+			// 	appConfig.Env.Hash = currentEnvFileHash
+			// }
+			// ymlData, _ := yaml.Marshal(&appConfig)
+			// os.WriteFile("./sidekick.yml", ymlData, 0644)
+		}()
+
+		if _, err := p.Run(); err != nil {
+			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}
-		dockerBuildStageSpinner.Success("Latest docker image built")
 
-		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		imgMoveCmd := exec.Command("sh", "-s", "-", appConfig.Name, "sidekick", viper.GetString("serverAddress"))
-		imgMoveCmd.Stdin = strings.NewReader(utils.ImageMoveScript)
-		_, imgMoveErr := imgMoveCmd.Output()
-		if imgMoveErr != nil {
-			log.Fatalf("Issue occurred with moving image to your VPS: %s", imgMoveErr)
-			os.Exit(1)
-		}
-		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appConfig.Name, appConfig.Name)); sessionErr != nil {
-			log.Fatal("Issue happened loading docker image")
-		}
+		// pterm.Println()
+		// pterm.Info.Printfln("😎 View your app at: https://%s", appConfig.Url)
 
-		if appConfig.Env.File != "" {
-			deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
-			_, sessionErr := utils.RunCommand(sshClient, deployScript)
-			if sessionErr != nil {
-				panic(sessionErr)
-			}
-		} else {
-			deployScript := replacer.Replace(utils.DeployAppScript)
-			_, sessionErr := utils.RunCommand(sshClient, deployScript)
-			if sessionErr != nil {
-				panic(sessionErr)
-			}
-		}
-		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-latest.tar", appConfig.Name))); sessionErr != nil {
-			log.Fatal("Issue happened cleaning up the image file")
-		}
-
-		latestVersion := strings.Split(appConfig.Version, "")[1]
-		latestVersionInt, _ := strconv.ParseInt(latestVersion, 0, 64)
-		appConfig.Version = fmt.Sprintf("V%d", latestVersionInt+1)
-		// env file changed ? -> update hash
-		if envFileChanged {
-			appConfig.Env.Hash = currentEnvFileHash
-		}
-		ymlData, err := yaml.Marshal(&appConfig)
-		os.WriteFile("./sidekick.yml", ymlData, 0644)
-		deployStageSpinner.Success("🙌 Deployed new version successfully 🙌")
-		multi.Stop()
-
-		pterm.Println()
-		pterm.Info.Printfln("😎 View your app at: https://%s", appConfig.Url)
-
-		pterm.Println()
+		// pterm.Println()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(deployCmd)
+}
+
+var (
+	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).MarginRight(1)
+	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575"))
+	cancelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Faint(true)
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000"))
+	pendingStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	appStyle     = lipgloss.NewStyle()
+)
+
+func getLogContainerStyle(m deployModel) lipgloss.Style {
+	return lipgloss.
+		NewStyle().
+		Width(int(0.8 * float64(m.ViewportWidth))).
+		Height(0).
+		MarginLeft(1).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("69")).
+		Foreground(lipgloss.Color("white")).Faint(true)
+}
+func getBannerStyle(m deployModel) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("white")).
+		Background(lipgloss.Color("#414868")).
+		Width(m.ViewportWidth).
+		Padding(1).
+		Align(lipgloss.Center).
+		MarginBottom(1).
+		MarginTop(1)
+}
+
+func newModel(cmdStages []stage) deployModel {
+	return deployModel{
+		Stages:      cmdStages,
+		ActiveIndex: 0,
+		Quitting:    false,
+	}
+}
+
+func (m deployModel) Init() tea.Cmd {
+	return m.Stages[m.ActiveIndex].Spinner.Tick
+}
+
+func (m deployModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+
+	case tea.KeyMsg:
+		m.Quitting = true
+
+		return m, tea.Quit
+
+	case tea.WindowSizeMsg:
+		m.ViewportHeight = msg.Height
+		m.ViewportWidth = msg.Width
+		return m, nil
+
+	case logMsg:
+		logStage := m.Stages[m.ActiveIndex]
+		logStage.Logs = append(logStage.Logs, msg.LogLine)
+		m.Stages[m.ActiveIndex] = logStage
+
+		return m, nil
+
+	case errorMsg:
+		logStage := m.Stages[m.ActiveIndex]
+		logStage.HasError = true
+		if msg.ErrorStr != "" {
+			logStage.Logs = append(logStage.Logs, msg.ErrorStr)
+		}
+		m.Stages[m.ActiveIndex] = logStage
+
+		return m, tea.Quit
+
+	case setStateMsg:
+		m.ActiveIndex = msg.ActiveIndex
+
+		return m, m.Stages[m.ActiveIndex].Spinner.Tick
+
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.Stages[m.ActiveIndex].Spinner, cmd = m.Stages[m.ActiveIndex].Spinner.Update(msg)
+		return m, cmd
+	default:
+		return m, nil
+	}
+}
+
+func (m deployModel) View() string {
+	var s string
+	printSlice := []string{}
+
+	printSlice = append(printSlice, getBannerStyle(m).Render("Deploying a new version of your app 😏"))
+
+	var logs string
+	for _, res := range m.Stages[m.ActiveIndex].Logs {
+		logs += res
+	}
+
+	for index, stage := range m.Stages {
+		if index < m.ActiveIndex {
+			printSlice = append(printSlice, successStyle.Render("✔ "+stage.Success))
+		} else if index == m.ActiveIndex {
+			if !stage.HasError {
+				printSlice = append(printSlice, stage.Spinner.View()+stage.Title)
+			} else {
+				u := tree.Root("⚠ " + stage.Title).Child(stage.Logs[:1])
+				printSlice = append(printSlice, errorStyle.Render(u.String()))
+			}
+			if stage.HasLogs && !stage.HasError {
+				var t string
+				if !stage.HasError {
+					l := len(stage.Logs)
+					if l < 5 {
+						t = getLogContainerStyle(m).Render(stage.Logs...)
+					} else {
+						t = getLogContainerStyle(m).Render(stage.Logs[l-5:]...)
+					}
+				} else {
+					t = getLogContainerStyle(m).Render(stage.Logs...)
+				}
+				printSlice = append(printSlice, t)
+			}
+		} else if index > m.ActiveIndex {
+			var text string
+			if m.Quitting {
+				text = cancelStyle.Render("CANCELLED " + stage.Title)
+			} else {
+				text = pendingStyle.Render("󰚭 " + stage.Title)
+			}
+			printSlice = append(printSlice, pendingStyle.Render(text))
+		}
+	}
+
+	s += lipgloss.JoinVertical(lipgloss.Top, printSlice...)
+
+	s += "\n"
+
+	if m.Quitting {
+		s += "\n"
+	}
+
+	return appStyle.Render(s)
+}
+
+func makeStage(title string, success string, hasLogs bool) stage {
+	s := spinner.New()
+	s.Style = spinnerStyle
+	s.Spinner = spinner.MiniDot
+
+	logs := []string{}
+
+	return stage{
+		Spinner: s,
+		Title:   title,
+		Success: success,
+		Logs:    logs,
+		HasLogs: hasLogs,
+	}
 }
