@@ -174,7 +174,7 @@ var launchCmd = &cobra.Command{
 			pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
 			os.Exit(1)
 		}
-		_, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
+		_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 		if sessionErr != nil {
 			panic(sessionErr)
 		}
@@ -186,7 +186,7 @@ var launchCmd = &cobra.Command{
 			log.Fatalf("Issue occured with moving image to your VPS: %s", imgMoveErr)
 			os.Exit(1)
 		}
-		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appName, appName)); sessionErr != nil {
+		if _, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appName, appName)); sessionErr != nil {
 			log.Fatal("Issue happened loading docker image")
 		}
 
@@ -199,17 +199,17 @@ var launchCmd = &cobra.Command{
 			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 			encryptSync.Run()
 
-			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
 			if sessionErr1 != nil {
 				fmt.Println("something went wrong")
 			}
 		} else {
-			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
 			if sessionErr1 != nil {
 				panic(sessionErr1)
 			}
 		}
-		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appName, fmt.Sprintf("%s-latest.tar", appName))); sessionErr != nil {
+		if _, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appName, fmt.Sprintf("%s-latest.tar", appName))); sessionErr != nil {
 			log.Fatal("Issue happened cleaning up the image file")
 		}
 

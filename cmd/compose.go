@@ -199,7 +199,7 @@ to quickly create a Cobra application.`,
 		launchPb.Increment()
 
 		setupSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		_, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
+		_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 		if sessionErr != nil {
 			panic(sessionErr)
 		}
@@ -209,12 +209,12 @@ to quickly create a Cobra application.`,
 			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 			encryptSync.Run()
 
-			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
 			if sessionErr1 != nil {
 				fmt.Println("something went wrong")
 			}
 		} else {
-			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
 			if sessionErr1 != nil {
 				panic(sessionErr1)
 			}

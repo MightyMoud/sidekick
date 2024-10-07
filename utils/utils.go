@@ -39,7 +39,7 @@ type CommandsStage struct {
 	SpinnerFailMessage    string
 }
 
-func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
+func RunCommand(client *ssh.Client, cmd string) (chan string, chan string, error) {
 	session, err := client.NewSession()
 	errChannel := make(chan string)
 	stdOutChannel := make(chan string)
@@ -50,11 +50,11 @@ func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
 	// Need to hook into the pipe of output coming from that session
 	stdoutReader, err := session.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("error getting stdout reader: %s", err)
+		return nil, nil, fmt.Errorf("error getting stdout reader: %s", err)
 	}
 	stderrReader, err := session.StderrPipe()
 	if err != nil {
-		return nil, fmt.Errorf("error getting stderr reader: %s", err)
+		return nil, nil, fmt.Errorf("error getting stderr reader: %s", err)
 	}
 
 	// make a scanner of that reader that will read as we get new stuff
@@ -65,30 +65,30 @@ func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
 	go func() {
 		for stdoutScanner.Scan() {
 			stdOutChannel <- stdoutScanner.Text()
-			fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
+			// fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
 		}
 	}()
 
 	go func() {
 		for stderrScanner.Scan() {
 			errChannel <- stderrScanner.Text()
-			fmt.Printf("\n\033[31m[STDERR]\033[0m %s\n", stderrScanner.Text())
+			// fmt.Printf("\n\033[31m[STDERR]\033[0m %s\n", stderrScanner.Text())
 		}
 	}()
 
 	if err := session.Run(cmd); err != nil {
-		session.Close()
+		defer session.Close()
 		errString := <-errChannel
-		return nil, fmt.Errorf("error running command - %s: - %s", cmd, errString)
+		return nil, nil, fmt.Errorf("error running command - %s: - %s", cmd, errString)
 	}
 
 	time.Sleep(time.Millisecond * 500)
-	return stdOutChannel, nil
+	return stdOutChannel, errChannel, nil
 }
 
 func RunCommands(client *ssh.Client, commands []string) error {
 	for _, cmd := range commands {
-		_, err := RunCommand(client, cmd)
+		_, _, err := RunCommand(client, cmd)
 		if err != nil {
 			return err
 		}

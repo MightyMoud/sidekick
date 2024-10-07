@@ -26,7 +26,7 @@ var ImageMoveScript = `
 	server=$3
 	tag=${4:-"latest"}
 
-	scp -C $appName-$tag.tar $user@$server:./$appName
+	scp -C -v $appName-$tag.tar $user@$server:./$appName
 
 	rm $appName-$tag.tar
 	`

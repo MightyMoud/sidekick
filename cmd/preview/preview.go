@@ -152,17 +152,17 @@ var PreviewCmd = &cobra.Command{
 			log.Fatalf("Issue occurred with moving image to your VPS: %s", imgMoveErr)
 			os.Exit(1)
 		}
-		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-%s.tar", appConfig.Name, appConfig.Name, deployHash)); sessionErr != nil {
+		if _, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-%s.tar", appConfig.Name, appConfig.Name, deployHash)); sessionErr != nil {
 			log.Fatal("Issue happened loading docker image")
 		}
-		if _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-%s.tar", appConfig.Name, deployHash))); sessionErr != nil {
+		if _, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-%s.tar", appConfig.Name, deployHash))); sessionErr != nil {
 			log.Fatal("Issue happened cleaning up the image file")
 		}
 
 		dockerBuildStageSpinner.Success("Successfully built and pushed docker image")
 
 		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		_, sessionErr0 := utils.RunCommand(sshClient, fmt.Sprintf(`mkdir -p %s/preview/%s`, appConfig.Name, deployHash))
+		_, _, sessionErr0 := utils.RunCommand(sshClient, fmt.Sprintf(`mkdir -p %s/preview/%s`, appConfig.Name, deployHash))
 		if sessionErr0 != nil {
 			panic(sessionErr0)
 		}
@@ -172,12 +172,12 @@ var PreviewCmd = &cobra.Command{
 			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s/preview/%s", appConfig.Name, deployHash)))
 			encryptSync.Run()
 
-			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appConfig.Name, deployHash))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appConfig.Name, deployHash))
 			if sessionErr1 != nil {
 				panic(sessionErr1)
 			}
 		} else {
-			_, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && docker compose -p sidekick up -d`, appConfig.Name, deployHash))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && docker compose -p sidekick up -d`, appConfig.Name, deployHash))
 			if sessionErr1 != nil {
 				panic(sessionErr1)
 			}

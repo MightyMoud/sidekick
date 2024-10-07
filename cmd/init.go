@@ -108,7 +108,7 @@ var initCmd = &cobra.Command{
 			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
 			panic(err)
 		}
-		ch, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
+		ch, _, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
 		if sessionErr != nil {
 			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
 			panic(sessionErr)
