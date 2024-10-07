@@ -33,16 +33,10 @@ I'm tired of the complexity involved in hosting my side projects. While some pla
 
 ## Installation
 
-On a Mac:
+Using brew:
 
 ```bash
 brew install sidekick
-```
-
-Linux/Windows you need GO installed on your system then you need to run:
-
-```bash
-go install github.com/mightymoud/sidekick@latest
 ```
 
 ## Usage
@@ -77,8 +71,10 @@ Then you need to enter the following:
 
 After that Sidekick will setup many things on your VPS - Usually takes around 2 mins
 
+You can use flags instead. Read more [in the docs](https://www.sidekickdeploy.com/docs/command/init/).
+
 <details>
-  <summary>What does Sidekick do when I run this command</summary>
+  <summary>What does Sidekick do when I run this command?</summary>
   
 * Login with `root` user
 * Make a new user `sidekick` and grant sudo access
@@ -94,13 +90,19 @@ After that Sidekick will setup many things on your VPS - Usually takes around 2 
 </details>
 
 <details>
-  <summary><strong>If you are on a Mac make sure to:</strong></summary>
-  
-* Run `ssh-add --apple-use-keychain ~/.ssh/YOUR_KEY` first before running this command.
+  <summary>Which SSH key will Sidekick use to login?</summary>
 
-This will be fixed soon in our next release where Sidekick will check the default key before grabbing the keys from the ssh agent.
+Sidekick will look up the default keys in your default .ssh directory in the following order:
+
+- id_rsa.pub
+- id_ecdsa.pub
+- id_ed25519.pub
+
+Sidekick will also get all keys from the `ssh-agent` and try them as well. If you want to use a custom key and not a default one, you would need to add the to your agent first by running `ssh-add KEY_FILE`
 
 </details>
+
+Read more details about flags and other options for this command [on the docs](https://www.sidekickdeploy.com/docs/command/init/)
 
 ### Launch a new application
 

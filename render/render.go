@@ -15,6 +15,8 @@ limitations under the License.
 package render
 
 import (
+	"os"
+
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 )
@@ -27,4 +29,29 @@ func RenderSidekickBig() {
 		putils.LettersFromStringWithStyle("kick", pterm.FgLightMagenta.ToStyle())).Srender()
 	pterm.DefaultCenter.Println(s)
 
+}
+
+func RenderKeyValidation(resultLines []string, keyHash string, hostname string) {
+	startColor := pterm.NewRGB(0, 255, 255)
+	endColor := pterm.NewRGB(255, 0, 255)
+
+	pterm.DefaultCenter.Print(keyHash)
+	for i := 0; i < len(resultLines[1:]); i++ {
+		fadeFactor := float32(i) / float32(20)
+		currentColor := startColor.Fade(0, 1, fadeFactor, endColor)
+		pterm.DefaultCenter.Print(currentColor.Sprint(resultLines[1:][i]))
+	}
+	prompt := pterm.DefaultInteractiveContinue
+
+	pterm.DefaultCenter.Printf(pterm.FgYellow.Sprintf("This is the ASCII art and fingerprint of your VPS's public key at %s", hostname))
+	pterm.DefaultCenter.Printf(pterm.FgYellow.Sprint("Please confirm you want to continue with the connection"))
+	pterm.DefaultCenter.Printf(pterm.FgYellow.Sprint("Sidekick will add this host/key pair to known_hosts"))
+	pterm.Println()
+
+	prompt.DefaultText = "Would you like to proceed?"
+	prompt.Options = []string{"yes", "no"}
+	if result, _ := prompt.Show(); result != "yes" {
+		pterm.Error.Println("In order to continue, you need to accept this.")
+		os.Exit(0)
+	}
 }
