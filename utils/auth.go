@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/mightymoud/sidekick/render"
 	"github.com/skeema/knownhosts"
@@ -115,19 +116,29 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 		}
 		return err
 	})
-	// now that we have our key, we need to start ssh client sesssion
-	config := &ssh.ClientConfig{
-		User:            sshUser,
-		Auth:            authMethods,
-		HostKeyCallback: cb,
-	}
 
-	// create SSH client with the said config and connect to server
-	client, sshClientErr := ssh.Dial("tcp", fmt.Sprintf("%s:%s", server, sshPort), config)
-	if sshClientErr != nil {
-		log.Fatalf("Failed to create ssh client to the server: %v", sshClientErr)
-	}
+	var client *ssh.Client
 
+	// This error will be thrown when one method/key doesn't work
+	var expectedClientErr = errors.New("ssh: handshake failed: ssh: unable to authenticate, attempted methods [none publickey], no supported methods remain")
+	for _, method := range authMethods {
+		config := &ssh.ClientConfig{
+			User:            sshUser,
+			Auth:            []ssh.AuthMethod{method},
+			HostKeyCallback: cb,
+			Timeout:         5 * time.Second,
+		}
+
+		workingClient, sshClientErr := ssh.Dial("tcp", fmt.Sprintf("%s:%s", server, sshPort), config)
+		if sshClientErr != nil {
+			if sshClientErr.Error() != expectedClientErr.Error() {
+				log.Fatalf("Failed to create ssh client to the server: %v", sshClientErr)
+			}
+			continue
+		}
+		client = workingClient
+		break
+	}
 	return client, nil
 }
 

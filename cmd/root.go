@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "dev"
+var version = "v0.6.2"
 
 var rootCmd = &cobra.Command{
 	Use:     "sidekick",
