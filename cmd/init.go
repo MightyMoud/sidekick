@@ -15,6 +15,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh"
 )
 
 // initCmd represents the init command
@@ -35,12 +37,32 @@ var initCmd = &cobra.Command{
 		You wil need to provide your VPS IPv4 address and a registry to host your docker images.
 		`,
 	Run: func(cmd *cobra.Command, args []string) {
-		initConfig()
 		pterm.DefaultBasicText.Println("Welcome to Sidekick. We need to collect some details from you first")
 
 		render.RenderSidekickBig()
-		server := viper.GetString("serverAddress")
-		certEmail := viper.GetString("certEmail")
+
+		if configErr := utils.ViperInit(); configErr != nil {
+			if errors.As(configErr, &viper.ConfigFileNotFoundError{}) {
+				initConfig()
+			} else {
+				pterm.Error.Printfln("%s", configErr)
+				os.Exit(1)
+			}
+		}
+
+		skipPromptsFlag, skipFlagErr := cmd.Flags().GetBool("yes")
+		if skipFlagErr != nil {
+			fmt.Println(skipFlagErr)
+		}
+
+		server, serverFlagErr := cmd.Flags().GetString("server")
+		if serverFlagErr != nil {
+			fmt.Println(serverFlagErr)
+		}
+		certEmail, emailFlagError := cmd.Flags().GetString("email")
+		if emailFlagError != nil {
+			fmt.Println(emailFlagError)
+		}
 
 		if server == "" {
 			serverTextInput := pterm.DefaultInteractiveTextInput
@@ -62,6 +84,24 @@ var initCmd = &cobra.Command{
 			}
 		}
 
+		// if public key exists -> a server is already setup
+		publicKey := viper.GetString("publicKey")
+		if publicKey != "" && server != viper.GetString("serverAddress") && !skipPromptsFlag {
+			prompt := pterm.DefaultInteractiveConfirm
+			prompt.DefaultText = "A server was previously setup with Sidekick. Would you like to override the settings?"
+			result, showErr := prompt.Show()
+			if showErr != nil {
+				pterm.Error.Printfln("Something went wrong: %s", showErr)
+				os.Exit(1)
+			}
+			if !result {
+				pterm.Println()
+				pterm.Error.Println("Currently Sidekick only supports one server per setup")
+				pterm.Println()
+				os.Exit(0)
+			}
+		}
+
 		viper.Set("serverAddress", server)
 		viper.Set("certEmail", certEmail)
 
@@ -69,10 +109,22 @@ var initCmd = &cobra.Command{
 		pterm.DefaultHeader.WithFullWidth().Println("Sidekick booting up! 🚀")
 		pterm.Println()
 
-		// init login with checking handshake
-		rootSshClient, err := utils.Login(server, "root")
-		if err != nil {
-			log.Fatalf("Unable to login using 'root' user: %s", err)
+		var sshClient *ssh.Client
+		var initSessionErr error
+		var loggedInUser string
+		users := []string{"root", "sidekick"}
+		canConnect := false
+		for _, user := range users {
+			sshClient, initSessionErr = utils.Login(server, user)
+			if initSessionErr != nil {
+				continue
+			}
+			loggedInUser = user
+			canConnect = true
+			break
+		}
+		if !canConnect {
+			pterm.Error.Println("Unable to establish SSH connection to the server")
 			os.Exit(1)
 		}
 
@@ -89,9 +141,26 @@ var initCmd = &cobra.Command{
 		rootLoginSpinner.Success("Logged in successfully!")
 
 		stage0Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		if err := utils.RunStage(rootSshClient, utils.UsersetupStage); err != nil {
-			stage0Spinner.Fail(utils.UsersetupStage.SpinnerFailMessage)
-			panic(err)
+
+		hasSidekickUser := true
+		outChan, sessionErr := utils.RunCommand(sshClient, "id -u sidekick")
+		if sessionErr != nil {
+			hasSidekickUser = false
+		} else {
+			select {
+			case output := <-outChan:
+				if output != "0" {
+					hasSidekickUser = true
+				}
+			}
+
+		}
+		if !hasSidekickUser && loggedInUser == "root" {
+			if err := utils.RunStage(sshClient, utils.UsersetupStage); err != nil {
+				stage0Spinner.Fail(utils.UsersetupStage.SpinnerFailMessage)
+				panic(err)
+			}
+
 		}
 		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
 
@@ -99,7 +168,7 @@ var initCmd = &cobra.Command{
 		sidekickSshClient, err := utils.Login(server, "sidekick")
 		if err != nil {
 			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
-			panic(err)
+			// panic(err)
 		}
 		sidekickLoginSpinner.Success("Logged in successfully with new user!")
 
@@ -108,39 +177,84 @@ var initCmd = &cobra.Command{
 			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
 			panic(err)
 		}
-		ch, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
+		ageSetup := false
+		outCh, sessionErr := utils.RunCommand(sshClient, `[ -f "$HOME/.config/sops/age/keys.txt" ] && echo "1" || echo "0"`)
 		if sessionErr != nil {
-			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
-			panic(sessionErr)
+			log.Fatal("issue with checking age")
 		}
+
 		select {
-		case output := <-ch:
-			if strings.HasPrefix(output, "Public key") {
-				publicKey := strings.Split(output, " ")[2:3]
-				viper.Set("publicKey", publicKey[0])
+		case output := <-outCh:
+			if output == "1" {
+				ageSetup = true
 			}
+			break
+		}
+		if !ageSetup {
+			ch, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
+			if sessionErr != nil {
+				stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
+				panic(sessionErr)
+			}
+			select {
+			case output := <-ch:
+				if strings.HasPrefix(output, "Public key") {
+					publicKey := strings.Split(output, " ")[2:3]
+					viper.Set("publicKey", publicKey[0])
+				}
+			}
+
 		}
 		stage1Spinner.Success(utils.SetupStage.SpinnerSuccessMessage)
 
 		stage2Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		if err := utils.RunStage(sidekickSshClient, utils.DockerStage); err != nil {
-			stage2Spinner.Fail(utils.DockerStage.SpinnerFailMessage)
-			panic(err)
+		dockerReady := false
+		dockOutCh, sessionErr := utils.RunCommand(sshClient, `command -v docker &> /dev/null && command -v docker compose &> /dev/null && echo "1" || echo "0"`)
+		if sessionErr != nil {
+			log.Fatal("Issue checking Docker")
+		}
+
+		select {
+		case output := <-dockOutCh:
+			if output == "1" {
+				dockerReady = true
+			}
+			break
+		}
+		if !dockerReady {
+			if err := utils.RunStage(sidekickSshClient, utils.DockerStage); err != nil {
+				stage2Spinner.Fail(utils.DockerStage.SpinnerFailMessage)
+				panic(err)
+			}
 		}
 		stage2Spinner.Success(utils.DockerStage.SpinnerSuccessMessage)
 
 		stage3Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		traefikSetup := false
+		trOutCh, sessionErr := utils.RunCommand(sshClient, `[ -d "sidekick-traefik" ] && echo "1" || echo "0"`)
+		if sessionErr != nil {
+			log.Fatal("Issue with checking folder traefik")
+		}
+
+		select {
+		case output := <-trOutCh:
+			if output == "1" {
+				traefikSetup = true
+			}
+			break
+		}
 		traefikStage := utils.GetTraefikStage(certEmail)
-		if err := utils.RunStage(sidekickSshClient, traefikStage); err != nil {
-			stage3Spinner.Fail(traefikStage.SpinnerFailMessage)
-			panic(err)
+		if !traefikSetup {
+			if err := utils.RunStage(sidekickSshClient, traefikStage); err != nil {
+				stage3Spinner.Fail(traefikStage.SpinnerFailMessage)
+				panic(err)
+			}
 		}
 		stage3Spinner.Success(traefikStage.SpinnerSuccessMessage)
 
 		if err := viper.WriteConfig(); err != nil {
 			panic(err)
 		}
-
 		multi.Stop()
 
 		pterm.Println()
@@ -178,8 +292,6 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 
 	initCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
-	viper.BindPFlag("serverAddress", initCmd.Flags().Lookup("server"))
-
 	initCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
-	viper.BindPFlag("certEmail", initCmd.Flags().Lookup("email"))
+	initCmd.Flags().BoolP("yes", "y", false, "Skip all validation prompts")
 }

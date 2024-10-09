@@ -65,14 +65,14 @@ func RunCommand(client *ssh.Client, cmd string) (chan string, error) {
 	go func() {
 		for stdoutScanner.Scan() {
 			stdOutChannel <- stdoutScanner.Text()
-			fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
+			// fmt.Printf("\033[34m[STDOUT]\033[0m %s\n", stdoutScanner.Text())
 		}
 	}()
 
 	go func() {
 		for stderrScanner.Scan() {
 			errChannel <- stderrScanner.Text()
-			fmt.Printf("\n\033[31m[STDERR]\033[0m %s\n", stderrScanner.Text())
+			// fmt.Printf("\n\033[31m[STDERR]\033[0m %s\n", stderrScanner.Text())
 		}
 	}()
 
@@ -138,7 +138,7 @@ func ViperInit() error {
 	viper.SetConfigName("default")
 	err = viper.ReadInConfig()
 	if err != nil {
-		return fmt.Errorf("Fatal error config file: %w", err)
+		return err
 	}
 	server := viper.GetString("serverAddress")
 	if server == "" {
