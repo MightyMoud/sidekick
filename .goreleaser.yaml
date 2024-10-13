@@ -16,6 +16,8 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    ldflags:
+      - "-X 'github.com/mightymoud/sidekick/cmd.version={{.Tag}}'"
     goos:
       - linux
       - windows

@@ -147,6 +147,8 @@ It assumes that your VPS is already configured and that your application is read
 					envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", appConfig.Env.File))
 					envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
 					if envCmdErr := envCmd.Run(); envCmdErr != nil {
+						pterm.Error.Printfln("Something went wrong handling your env file: %s", envCmdErr)
+						os.Exit(1)
 						panic(envCmdErr)
 					}
 					encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfig.Name)))

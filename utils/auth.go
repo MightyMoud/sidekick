@@ -126,7 +126,7 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 			User:            sshUser,
 			Auth:            []ssh.AuthMethod{method},
 			HostKeyCallback: cb,
-			Timeout:         5 * time.Second,
+			Timeout:         1 * time.Second,
 		}
 
 		workingClient, sshClientErr := ssh.Dial("tcp", fmt.Sprintf("%s:%s", server, sshPort), config)
@@ -138,6 +138,9 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 		}
 		client = workingClient
 		break
+	}
+	if client == nil {
+		return nil, errors.New("Logging in failed with all available keys for the said user")
 	}
 	return client, nil
 }
