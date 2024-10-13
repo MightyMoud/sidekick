@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/mightymoud/sidekick/render"
@@ -129,7 +130,8 @@ var initCmd = &cobra.Command{
 		}
 
 		multi := pterm.DefaultMultiPrinter
-		rootLoginSpinner, _ := pterm.DefaultSpinner.Start("Logging in with root")
+		localReqsChecks, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up your local env")
+		rootLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging in with root")
 		stage0Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Adding user Sidekick")
 		sidekickLoginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into with sidekick user")
 		stage1Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up VPS")
@@ -137,6 +139,23 @@ var initCmd = &cobra.Command{
 		stage3Spinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Setting up Traefik")
 		pterm.Println()
 		multi.Start()
+
+		localReqsChecks.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
+		brewCheckCmd := exec.Command("brew", "-v")
+		_, brewCheckCmdErr := brewCheckCmd.CombinedOutput()
+		if brewCheckCmdErr != nil {
+			log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", brewCheckCmd)
+			os.Exit(1)
+		}
+
+		installSopsCmd := exec.Command("brew", "install", "sops")
+		_, installSopsCmdErr := installSopsCmd.CombinedOutput()
+		if installSopsCmdErr != nil {
+			log.Fatalf("Failed to install Sops. Sops is need to encrypt your local env: %s", installSopsCmd)
+			os.Exit(1)
+		}
+
+		localReqsChecks.Success("Installed local requirements successfully")
 
 		rootLoginSpinner.Success("Logged in successfully!")
 
@@ -153,7 +172,6 @@ var initCmd = &cobra.Command{
 					hasSidekickUser = true
 				}
 			}
-
 		}
 		if !hasSidekickUser && loggedInUser == "root" {
 			if err := utils.RunStage(sshClient, utils.UsersetupStage); err != nil {
@@ -168,7 +186,7 @@ var initCmd = &cobra.Command{
 		sidekickSshClient, err := utils.Login(server, "sidekick")
 		if err != nil {
 			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
-			// panic(err)
+			log.Fatal(err)
 		}
 		sidekickLoginSpinner.Success("Logged in successfully with new user!")
 
