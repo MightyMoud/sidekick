@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+Copyright © 2024 Mahmoud Mousa <m.mousa@hey.com>
 
 Licensed under the GNU GPL License, Version 3.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package preview
+package previewList
 
 import (
 	"log"
@@ -24,7 +24,7 @@ import (
 )
 
 // listCmd represents the list command
-var listCmd = &cobra.Command{
+var ListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"ls"},
 	Short:   "This command lists all the preview environments",

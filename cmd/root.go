@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+Copyright © 2024 Mahmoud Mousa <m.mousa@hey.com>
 
 Licensed under the GNU GPL License, Version 3.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/mightymoud/sidekick/cmd/deploy"
 	"github.com/mightymoud/sidekick/cmd/preview"
 	"github.com/spf13/cobra"
 )
@@ -40,4 +41,5 @@ func Execute() {
 func init() {
 	rootCmd.SetVersionTemplate(`{{println .Version}}`)
 	rootCmd.AddCommand(preview.PreviewCmd)
+	rootCmd.AddCommand(deploy.DeployCmd)
 }

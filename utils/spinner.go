@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+Copyright © 2024 Mahmoud Mousa <m.mousa@hey.com>
 
 Licensed under the GNU GPL License, Version 3.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 var stagedSpinner = pterm.DefaultSpinner
 
 func GetSpinner() pterm.SpinnerPrinter {
-	// stagedSpinner.Sequence = []string{"."}
-	// stagedSpinner.ShowTimer = false
+	stagedSpinner.Sequence = []string{"."}
+	stagedSpinner.ShowTimer = false
 	return stagedSpinner
 }

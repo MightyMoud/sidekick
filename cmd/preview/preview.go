@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 Mahmoud Mosua <m.mousa@hey.com>
+Copyright © 2024 Mahmoud Mousa <m.mousa@hey.com>
 
 Licensed under the GNU GPL License, Version 3.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	previewList "github.com/mightymoud/sidekick/cmd/preview/list"
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -203,5 +204,5 @@ var PreviewCmd = &cobra.Command{
 }
 
 func init() {
-	PreviewCmd.AddCommand(listCmd)
+	PreviewCmd.AddCommand(previewList.ListCmd)
 }
