@@ -39,6 +39,8 @@ Using brew:
 brew install sidekick
 ```
 
+NOTE: Sidekick uses `brew` later on to handle installing `sops` on your local. So `brew` is a requirement at this point. Sidekick will throw an error if `brew` is not found. You can install `brew` from [here](https://brew.sh/).
+
 ## Usage
 
 Sidekick helps you along all the steps of deployment on your VPS. From basic setup to zero downtime deploys, we got you! ✊
@@ -69,7 +71,8 @@ Then you need to enter the following:
 - IP Address of your VPS
 - An email address to use for setting up SSL certs
 
-After that Sidekick will setup many things on your VPS - Usually takes around 2 mins
+After that Sidekick will setup many things on your VPS - Usually takes around 2 mins.
+If you run this command once more and enter a different IP Address, Sidekick will warn you that you are overriding the current config with a prompt.
 
 You can use flags instead. Read more [in the docs](https://www.sidekickdeploy.com/docs/command/init/).
 
@@ -207,19 +210,7 @@ Simple CLI tool that can help you:
 You can easily remove sidekick if you hate it.
 
 ```bash
-// Mac/Linux
-cd $HOME/go/bin
-rm sidekick
-cd ~/.config
-rm -rf sidekick
-
-// Win
-cd %USERPROFILE%\go\bin
-del sidekick.exe
-
-// Powershell
-cd $HOME\go\bin
-Remove-Item sidekick.exe
+brew uninstall sidekick
 ```
 
 ---
