@@ -18,6 +18,7 @@ import (
 	"os"
 
 	"github.com/mightymoud/sidekick/cmd/deploy"
+	"github.com/mightymoud/sidekick/cmd/launch"
 	"github.com/mightymoud/sidekick/cmd/preview"
 	"github.com/spf13/cobra"
 )
@@ -42,4 +43,5 @@ func init() {
 	rootCmd.SetVersionTemplate(`{{println .Version}}`)
 	rootCmd.AddCommand(preview.PreviewCmd)
 	rootCmd.AddCommand(deploy.DeployCmd)
+	rootCmd.AddCommand(launch.LaunchCmd)
 }

@@ -166,11 +166,8 @@ var initCmd = &cobra.Command{
 		if sessionErr != nil {
 			hasSidekickUser = false
 		} else {
-			select {
-			case output := <-outChan:
-				if output != "0" {
-					hasSidekickUser = true
-				}
+			if <-outChan != "0" {
+				hasSidekickUser = true
 			}
 		}
 		if !hasSidekickUser && loggedInUser == "root" {
@@ -201,12 +198,8 @@ var initCmd = &cobra.Command{
 			log.Fatal("issue with checking age")
 		}
 
-		select {
-		case output := <-outCh:
-			if output == "1" {
-				ageSetup = true
-			}
-			break
+		if <-outCh == "1" {
+			ageSetup = true
 		}
 		if !ageSetup {
 			ch, _, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
@@ -214,14 +207,10 @@ var initCmd = &cobra.Command{
 				stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
 				panic(sessionErr)
 			}
-			select {
-			case output := <-ch:
-				if strings.HasPrefix(output, "Public key") {
-					publicKey := strings.Split(output, " ")[2:3]
-					viper.Set("publicKey", publicKey[0])
-				}
+			if strings.HasPrefix(<-ch, "Public key") {
+				publicKey := strings.Split(<-ch, " ")[2:3]
+				viper.Set("publicKey", publicKey[0])
 			}
-
 		}
 		stage1Spinner.Success(utils.SetupStage.SpinnerSuccessMessage)
 
@@ -232,12 +221,8 @@ var initCmd = &cobra.Command{
 			log.Fatal("Issue checking Docker")
 		}
 
-		select {
-		case output := <-dockOutCh:
-			if output == "1" {
-				dockerReady = true
-			}
-			break
+		if <-dockOutCh == "1" {
+			dockerReady = true
 		}
 		if !dockerReady {
 			if err := utils.RunStage(sidekickSshClient, utils.DockerStage); err != nil {
@@ -254,12 +239,8 @@ var initCmd = &cobra.Command{
 			log.Fatal("Issue with checking folder traefik")
 		}
 
-		select {
-		case output := <-trOutCh:
-			if output == "1" {
-				traefikSetup = true
-			}
-			break
+		if <-trOutCh == "1" {
+			traefikSetup = true
 		}
 		traefikStage := utils.GetTraefikStage(certEmail)
 		if !traefikSetup {

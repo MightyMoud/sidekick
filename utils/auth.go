@@ -78,7 +78,6 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 
 	conn, err := net.Dial("unix", sshAgentSock)
 	if err != nil {
-		log.Fatalf("Failed to connect to SSH agent: %s", err)
 		return nil, err
 	}
 	defer conn.Close()
@@ -95,8 +94,7 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 		khPath := fmt.Sprintf("%s/.ssh/known_hosts", currentUser.HomeDir)
 		kh, knErr := knownhosts.NewDB(khPath)
 		if knErr != nil {
-			log.Fatalf("Failed to read known_hosts: %s", err)
-			os.Exit(1)
+			return knErr
 		}
 
 		innerCallback := kh.HostKeyCallback()

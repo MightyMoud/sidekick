@@ -138,7 +138,7 @@ It assumes that your VPS is already configured and that your application is read
 			p.Send(nextStageMsg{})
 
 			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appConfig.Name)
-			imgMoveCmd := exec.Command("scp", "-C", "-v", imgFileName, remoteDist)
+			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
 			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
 			go sendLogsToTUI(imgMoveCmdErrorPipe, p)
 

@@ -17,7 +17,6 @@ package utils
 import (
 	"bufio"
 	"crypto/md5"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -109,11 +108,8 @@ func IsValidIPAddress(ip string) bool {
 
 	re := regexp.MustCompile(ipPattern)
 
-	if re.MatchString(ip) {
-		return true
-	}
+	return re.MatchString(ip)
 
-	return false
 }
 
 func FileExists(filename string) bool {
@@ -140,10 +136,6 @@ func ViperInit() error {
 	if err != nil {
 		return err
 	}
-	server := viper.GetString("serverAddress")
-	if server == "" {
-		return errors.New("Sidekick config not found. Please run sidekick init.")
-	}
 	return nil
 }
 
@@ -155,7 +147,6 @@ func LoadAppConfig() (SidekickAppConfig, error) {
 	appConfigFile := SidekickAppConfig{}
 	content, err := os.ReadFile("./sidekick.yml")
 	if err != nil {
-		fmt.Println(err)
 		pterm.Error.Println("Unable to process your project config")
 		os.Exit(1)
 	}

@@ -16,10 +16,32 @@ package render
 
 import (
 	"os"
+	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
+	"github.com/erikgeiser/promptkit/textinput"
 	"github.com/pterm/pterm"
 	"github.com/pterm/pterm/putils"
 )
+
+func GetDefaultTextInput(prompt string, defaultValue string, placeholder string) *textinput.TextInput {
+	input := textinput.New(prompt)
+
+	input.InitialValue = defaultValue
+	input.Placeholder = placeholder
+	input.InputTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("120"))
+
+	return input
+}
+
+func GetLogger(options log.Options) *log.Logger {
+	options.ReportCaller = false
+	options.ReportTimestamp = true
+	options.TimeFormat = time.Kitchen
+
+	return log.NewWithOptions(os.Stderr, options)
+}
 
 func RenderSidekickBig() {
 	pterm.Println()
