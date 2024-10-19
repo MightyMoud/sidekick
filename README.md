@@ -7,7 +7,7 @@
 Bare metal to production ready in mins; imagine fly.io on your VPS
 
   <div>
-    <img width="500px" src="/demo/imgs/hero.png">
+    <img width="600px" src="/demo/imgs/hero.png">
   </div>
 
 ![GitHub](https://img.shields.io/github/license/mightymoud/sidekick)
@@ -57,7 +57,7 @@ That's it!
 ### VPS Setup
 
   <div align="center" >
-    <img width="500px" src="/demo/imgs/init.png">
+    <img width="600px" src="/demo/imgs/init.png">
   </div>
 
 First you need to setup your VPS. To do this you need to run:
@@ -110,7 +110,7 @@ Read more details about flags and other options for this command [on the docs](h
 ### Launch a new application
 
   <div align="center" >
-    <img width="500px" src="/demo/imgs/launch.png">
+    <img width="600px" src="/demo/imgs/launch.png">
   </div>
 
 In your application folder, make sure you have a working `Dockerfile` that you can build and run. Also make sure you know at which port your app is expecting to receive traffic.
@@ -143,7 +143,7 @@ Should take around 2 more mins to be able to visit your application live on the 
 ### Deploy a new version
 
   <div align="center" >
-    <img width="500px" src="/demo/imgs/deploy.png">
+    <img width="600px" src="/demo/imgs/deploy.png">
   </div>
 With your application deployed, it's super simple to deploy a new version.
 
@@ -169,7 +169,7 @@ This command will also do a couple of things behind the scenes. You can check th
 ### Deploy a preview environment/app
 
   <div align="center" >
-    <img width="500px" src="/demo/imgs/preview.png">
+    <img width="600px" src="/demo/imgs/preview.png">
   </div>
 Sidekick also allows you to deploy preview apps at any point from your application. Preview apps are attached to your commit hash and require a clean git tree before you can initiate them. 
 Once you have a clean git tree, you can run the following command to deploy a preview app:
