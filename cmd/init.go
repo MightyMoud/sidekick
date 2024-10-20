@@ -85,8 +85,9 @@ var initCmd = &cobra.Command{
 			}
 		}
 
-		// if public key exists -> a server is already setup
+		// if keys exist -> a server is already setup
 		publicKey := viper.GetString("publicKey")
+		secretKey := viper.GetString("secretKey")
 		if publicKey != "" && server != viper.GetString("serverAddress") && !skipPromptsFlag {
 			prompt := pterm.DefaultInteractiveConfirm
 			prompt.DefaultText = "A server was previously setup with Sidekick. Would you like to override the settings?"
@@ -141,18 +142,32 @@ var initCmd = &cobra.Command{
 		multi.Start()
 
 		localReqsChecks.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		brewCheckCmd := exec.Command("brew", "-v")
-		_, brewCheckCmdErr := brewCheckCmd.CombinedOutput()
-		if brewCheckCmdErr != nil {
-			log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", brewCheckCmd)
-			os.Exit(1)
-		}
 
-		installSopsCmd := exec.Command("brew", "install", "sops")
-		_, installSopsCmdErr := installSopsCmd.CombinedOutput()
-		if installSopsCmdErr != nil {
-			log.Fatalf("Failed to install Sops. Sops is need to encrypt your local env: %s", installSopsCmd)
-			os.Exit(1)
+		_, sopsErr := exec.LookPath("sops")
+		if sopsErr != nil {
+			// log.Println("Sops not found, installing sops")
+			_, err := exec.LookPath("brew")
+			if err != nil {
+				log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", err)
+			}
+			installSopsCmd := exec.Command("brew", "install", "sops")
+			_, installSopsCmdErr := installSopsCmd.CombinedOutput()
+			if installSopsCmdErr != nil {
+				log.Fatalf("Failed to install Sops. Sops is needed to encrypt your local env: %s", installSopsCmd)
+			}
+		}
+		_, ageErr := exec.LookPath("age")
+		if ageErr != nil {
+			// log.Println("Age not found, installing Age")
+			_, err := exec.LookPath("brew")
+			if err != nil {
+				log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", err)
+			}
+			installAgeCmd := exec.Command("brew", "install", "age")
+			_, installAgeCmdErr := installAgeCmd.CombinedOutput()
+			if installAgeCmdErr != nil {
+				log.Fatalf("Failed to install Age. Age is needed to encrypt your local env: %s", installAgeCmd)
+			}
 		}
 
 		localReqsChecks.Success("Installed local requirements successfully")
@@ -195,34 +210,23 @@ var initCmd = &cobra.Command{
 			stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
 			panic(err)
 		}
-		ageSetup := false
-		outCh, _, sessionErr := utils.RunCommand(sshClient, `[ -f "$HOME/.config/sops/age/keys.txt" ] && echo "1" || echo "0"`)
-		if sessionErr != nil {
-			log.Fatal("issue with checking age")
-		}
 
-		select {
-		case output := <-outCh:
-			if output == "1" {
-				ageSetup = true
+		if publicKey == "" || secretKey == "" {
+			ageKeygenCmd := exec.Command("age-keygen")
+			cmdOutput, ageKeygenCmdErr := ageKeygenCmd.Output()
+			if ageKeygenCmdErr != nil {
+				log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", ageKeygenCmd)
+				os.Exit(1)
 			}
-			break
-		}
-		if !ageSetup {
-			ch, _, sessionErr := utils.RunCommand(sidekickSshClient, "mkdir -p $HOME/.config/sops/age/ && age-keygen -o $HOME/.config/sops/age/keys.txt 2>&1 ")
-			if sessionErr != nil {
-				stage1Spinner.Fail(utils.SetupStage.SpinnerFailMessage)
-				panic(sessionErr)
-			}
-			select {
-			case output := <-ch:
-				if strings.HasPrefix(output, "Public key") {
-					publicKey := strings.Split(output, " ")[2:3]
-					viper.Set("publicKey", publicKey[0])
-				}
-			}
+			ageKeyOut := string(cmdOutput)
+			outputSlice := strings.Split(ageKeyOut, "\n")
 
+			secretKey = outputSlice[2]
+			publicKey = strings.ReplaceAll(strings.Split(outputSlice[1], ":")[1], " ", "")
 		}
+		viper.Set("publicKey", publicKey)
+		viper.Set("secretKey", secretKey)
+
 		stage1Spinner.Success(utils.SetupStage.SpinnerSuccessMessage)
 
 		stage2Spinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
