@@ -49,6 +49,7 @@ var EnvEncryptionScript = `
 	`
 
 var DeployAppWithEnvScript = `
+	export SOPS_AGE_KEY=$age_secret_key && \
 	cd $service_name && \
 	old_container_id=$(docker ps -f name=$service_name -q | tail -n1) && \
 	sops exec-env encrypted.env 'docker compose -p sidekick up -d --no-deps --scale $service_name=2 --no-recreate $service_name' && \

@@ -25,6 +25,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	teaLog "github.com/charmbracelet/log"
+	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -46,6 +48,12 @@ It assumes that your VPS is already configured and that your application is read
 		}
 		if !utils.FileExists("./sidekick.yml") {
 			pterm.Error.Println(`Sidekick config not found in current directory Run sidekick launch`)
+			os.Exit(1)
+		}
+		if viper.GetString("secretKey") == "" {
+			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
+			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
+			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
 			os.Exit(1)
 		}
 
@@ -71,6 +79,7 @@ It assumes that your VPS is already configured and that your application is read
 		replacer := strings.NewReplacer(
 			"$service_name", appConfig.Name,
 			"$app_port", fmt.Sprint(appConfig.Port),
+			"$age_secret_key", viper.GetString("secretKey"),
 		)
 
 		go func() {

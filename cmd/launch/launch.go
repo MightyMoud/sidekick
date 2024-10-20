@@ -42,6 +42,13 @@ var LaunchCmd = &cobra.Command{
 			render.GetLogger(log.Options{Prefix: "Sidekick Config"}).Fatalf("%s", configErr)
 		}
 
+		if viper.GetString("secretKey") == "" {
+			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
+			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
+			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
+			os.Exit(1)
+		}
+
 		if utils.FileExists("./sidekick.yml") {
 			render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Error("Sidekick config exits in this project.")
 			render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Info("You can deploy a new version of your application with Sidekick deploy.")
@@ -238,7 +245,7 @@ var LaunchCmd = &cobra.Command{
 					p.Send(errorMsg{ErrorStr: encryptSyncErrr.Error()})
 				}
 
-				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName))
+				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName, viper.GetString("secretKey")))
 				go func() {
 					p.Send(logMsg{LogLine: <-runAppCmdOutChan + "\n"})
 					time.Sleep(time.Millisecond * 50)

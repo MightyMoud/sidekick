@@ -23,7 +23,9 @@ import (
 	"strings"
 	"time"
 
+	teaLog "github.com/charmbracelet/log"
 	previewList "github.com/mightymoud/sidekick/cmd/preview/list"
+	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -43,6 +45,13 @@ var PreviewCmd = &cobra.Command{
 		appConfig, appConfigErr := utils.LoadAppConfig()
 		if appConfigErr != nil {
 			log.Fatalln("Unable to load your config file. Might be corrupted")
+			os.Exit(1)
+		}
+
+		if viper.GetString("secretKey") == "" {
+			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
+			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
+			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
 			os.Exit(1)
 		}
 
@@ -173,7 +182,7 @@ var PreviewCmd = &cobra.Command{
 			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s/preview/%s", appConfig.Name, deployHash)))
 			encryptSync.Run()
 
-			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appConfig.Name, deployHash))
+			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appConfig.Name, deployHash, viper.GetString("secretKey")))
 			if sessionErr1 != nil {
 				panic(sessionErr1)
 			}
