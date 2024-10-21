@@ -25,6 +25,7 @@ import (
 
 	teaLog "github.com/charmbracelet/log"
 	previewList "github.com/mightymoud/sidekick/cmd/preview/list"
+	previewRemove "github.com/mightymoud/sidekick/cmd/preview/remove"
 	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/pterm/pterm"
@@ -215,4 +216,5 @@ var PreviewCmd = &cobra.Command{
 
 func init() {
 	PreviewCmd.AddCommand(previewList.ListCmd)
+	PreviewCmd.AddCommand(previewRemove.RemoveCmd)
 }

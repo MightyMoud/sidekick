@@ -15,11 +15,15 @@ limitations under the License.
 package previewList
 
 import (
-	"log"
+	"fmt"
 	"os"
 
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+	"github.com/charmbracelet/log"
+	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -30,21 +34,34 @@ var ListCmd = &cobra.Command{
 	Short:   "This command lists all the preview environments",
 	Long:    `This command lists all the preview environments that are currently running on your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		pterm.Println()
 		appConfig, appConfigErr := utils.LoadAppConfig()
 		if appConfigErr != nil {
-			log.Fatalln("Unable to load your config file. Might be corrupted")
-			os.Exit(1)
+			log.Fatalf("Unable to load your config file. Might be corrupted")
 		}
-		tableData := pterm.TableData{
-			{"Commit", "Image", "Deployed at", "URL"},
+		if len(appConfig.PreviewEnvs) == 0 {
+			render.GetLogger(log.Options{Prefix: "Preview Envs"}).Info("Not Found in current project")
+			os.Exit(0)
 		}
+		header := lipgloss.NewStyle().Foreground(lipgloss.Color("77")).MarginTop(1).MarginLeft(1).Render("Currently running preview envs:")
+		tableString := table.New().
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				switch {
+				case row == 0:
+					return lipgloss.NewStyle().Foreground(lipgloss.Color("60")).Align(lipgloss.Center)
+				default:
+					return lipgloss.NewStyle().Foreground(lipgloss.Color("78")).PaddingLeft(1).PaddingRight(1)
+				}
+			}).
+			Headers("Commit", "Image", "Deployed At", "URL")
+
+		hashSlice := []huh.Option[string]{}
 		for v := range appConfig.PreviewEnvs {
-			tableData = append(tableData, []string{v, appConfig.PreviewEnvs[v].Image, appConfig.PreviewEnvs[v].CreatedAt, appConfig.PreviewEnvs[v].Url})
+			hashSlice = append(hashSlice, huh.NewOption(v, v))
+			tableString.Row(v, appConfig.PreviewEnvs[v].Image, appConfig.PreviewEnvs[v].CreatedAt, appConfig.PreviewEnvs[v].Url)
 		}
-
-		pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(tableData).Render()
-
-		pterm.Println()
+		fmt.Println(header)
+		fmt.Println(tableString)
 	},
 }
