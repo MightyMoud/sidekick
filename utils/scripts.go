@@ -20,27 +20,6 @@ var sshKeyScript = `
 		echo "$publicKey" | ssh-keygen -lvf /dev/stdin 
 	`
 
-var ImageMoveScript = `
-	appName=$1
-	user=$2
-	server=$3
-	tag=${4:-"latest"}
-
-	scp -C -v $appName-$tag.tar $user@$server:./$appName
-
-	rm $appName-$tag.tar
-	`
-
-var DockerBuildAndSaveScript = `
-	appName=$1
-	projectFolder=$2
-	tag=${3:-"latest"}
-
-	docker build --tag $appName:$tag --progress=plain --platform linux/amd64 $projectFolder 
-
-	docker save -o $appName-$tag.tar $appName
-	`
-
 var EnvEncryptionScript = `
 	PUBKEY=$1
 	ENVFILE=$2

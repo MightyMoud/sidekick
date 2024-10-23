@@ -155,15 +155,16 @@ var LaunchCmd = &cobra.Command{
 		}
 		defer os.Remove("docker-compose.yaml")
 
-		cmdStages := []stage{
-			makeStage("Validating connection with VPS", "VPS is reachable", false),
-			makeStage("Building latest docker image of your app", "Latest docker image built", true),
-			makeStage("Saving docker image locally", "Image saved successfully", false),
-			makeStage("Moving image to your server", "Image moved and loaded successfully", false),
-			makeStage("Setting up your application", "Application setup successfully", false),
+		cmdStages := []render.Stage{
+			render.MakeStage("Validating connection with VPS", "VPS is reachable", false),
+			render.MakeStage("Building latest docker image of your app", "Latest docker image built", true),
+			render.MakeStage("Saving docker image locally", "Image saved successfully", false),
+			render.MakeStage("Moving image to your server", "Image moved and loaded successfully", false),
+			render.MakeStage("Setting up your application", "Application setup successfully", false),
 		}
-		p := tea.NewProgram(model{
+		p := tea.NewProgram(render.TuiModel{
 			Stages:      cmdStages,
+			BannerMsg:   "Launching your application on your VPS 🚀",
 			ActiveIndex: 0,
 			Quitting:    false,
 			AllDone:     false,
@@ -172,104 +173,96 @@ var LaunchCmd = &cobra.Command{
 		go func() {
 			sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
 			if err != nil {
-				p.Send(errorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
+				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			cwd, _ := os.Getwd()
-			imgFileName := fmt.Sprintf("%s-latest.tar", appName)
 			dockerBuildCmd := exec.Command("docker", "build", "--tag", appName, "--progress=plain", "--platform=linux/amd64", cwd)
 			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
-			go sendLogsToTUI(dockerBuildCmdErrPipe, p)
+			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 
 			if dockerBuildErr := dockerBuildCmd.Run(); dockerBuildErr != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
+			imgFileName := fmt.Sprintf("%s-latest.tar", appName)
 			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appName)
 			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
-			go sendLogsToTUI(imgSaveCmdErrPipe, p)
+			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
 
 			if imgSaveCmdErr := imgSaveCmd.Run(); imgSaveCmdErr != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 			if sessionErr != nil {
-				p.Send(errorMsg{ErrorStr: sessionErr.Error()})
+				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
 			}
 
 			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appName)
 			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
 			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
-			go sendLogsToTUI(imgMoveCmdErrorPipe, p)
+			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
 
 			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
 			defer os.Remove(imgFileName)
 
 			time.Sleep(time.Millisecond * 200)
 
-			dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appName, appName))
+			dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s && rm %s", appName, imgFileName, imgFileName))
 			go func() {
-				p.Send(logMsg{LogLine: <-dockerLoadOutChan + "\n"})
+				p.Send(render.LogMsg{LogLine: <-dockerLoadOutChan + "\n"})
 				time.Sleep(time.Millisecond * 50)
 			}()
 			if sessionErr != nil {
 				time.Sleep(time.Millisecond * 100)
-				p.Send(errorMsg{ErrorStr: sessionErr.Error()})
+				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
 			}
 
 			time.Sleep(time.Millisecond * 100)
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
 			rsyncCmErr := rsyncCmd.Run()
 			if rsyncCmErr != nil {
-				p.Send(errorMsg{ErrorStr: rsyncCmErr.Error()})
+				p.Send(render.ErrorMsg{ErrorStr: rsyncCmErr.Error()})
 			}
 
 			if hasEnvFile {
 				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
-				encryptSyncErrr := encryptSync.Run()
-				if encryptSyncErrr != nil {
-					p.Send(errorMsg{ErrorStr: encryptSyncErrr.Error()})
+				encryptSyncErr := encryptSync.Run()
+				if encryptSyncErr != nil {
+					p.Send(render.ErrorMsg{ErrorStr: encryptSyncErr.Error()})
 				}
 
 				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName, viper.GetString("secretKey")))
 				go func() {
-					p.Send(logMsg{LogLine: <-runAppCmdOutChan + "\n"})
+					p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
 					time.Sleep(time.Millisecond * 50)
 				}()
 				if sessionErr1 != nil {
-					p.Send(errorMsg{ErrorStr: sessionErr1.Error()})
+					p.Send(render.ErrorMsg{ErrorStr: sessionErr1.Error()})
 				}
 			} else {
 				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
 				go func() {
-					p.Send(logMsg{LogLine: <-runAppCmdOutChan + "\n"})
+					p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
 					time.Sleep(time.Millisecond * 50)
 				}()
 				if sessionErr1 != nil {
-					p.Send(errorMsg{ErrorStr: sessionErr1.Error()})
+					p.Send(render.ErrorMsg{ErrorStr: sessionErr1.Error()})
 				}
-			}
-			cleanOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appName, fmt.Sprintf("%s-latest.tar", appName)))
-			go func() {
-				p.Send(logMsg{LogLine: <-cleanOutChan + "\n"})
-				time.Sleep(time.Millisecond * 100)
-			}()
-			if sessionErr != nil {
-				p.Send(errorMsg{ErrorStr: sessionErr.Error()})
 			}
 
 			portNumber, err := strconv.ParseUint(appPort, 0, 64)
@@ -292,7 +285,7 @@ var LaunchCmd = &cobra.Command{
 			}
 			ymlData, _ := yaml.Marshal(&sidekickAppConfig)
 			os.WriteFile("./sidekick.yml", ymlData, 0644)
-			p.Send(allDoneMsg{Duration: time.Since(start).Round(time.Second), URL: appDomain})
+			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: appDomain})
 		}()
 
 		if _, err := p.Run(); err != nil {

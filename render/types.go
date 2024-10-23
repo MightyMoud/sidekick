@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package deploy
+package render
 
 import (
 	"time"
@@ -21,21 +21,21 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type logMsg struct {
+type LogMsg struct {
 	LogLine string
 }
 
-type allDoneMsg struct {
+type AllDoneMsg struct {
 	Duration time.Duration
 	URL      string
 }
 
-type errorMsg struct {
+type ErrorMsg struct {
 	ErrorStr string
 }
-type nextStageMsg struct{}
+type NextStageMsg struct{}
 
-type stage struct {
+type Stage struct {
 	Title    string
 	Success  string
 	Spinner  spinner.Model
@@ -44,14 +44,15 @@ type stage struct {
 	HasError bool
 }
 
-type model struct {
+type TuiModel struct {
 	tea.Model
 	ActiveIndex    int
-	Stages         []stage
+	Stages         []Stage
 	Quitting       bool
 	ViewportWidth  int
 	ViewportHeight int
 	AllDone        bool
 	Duration       time.Duration
 	URL            string
+	BannerMsg      string
 }

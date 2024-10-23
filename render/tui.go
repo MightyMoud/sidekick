@@ -12,8 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
-package launch
+package render
 
 import (
 	"bufio"
@@ -36,11 +35,11 @@ var (
 	appStyle     = lipgloss.NewStyle()
 )
 
-func (m model) Init() tea.Cmd {
+func (m TuiModel) Init() tea.Cmd {
 	return m.Stages[m.ActiveIndex].Spinner.Tick
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.KeyMsg:
@@ -53,30 +52,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ViewportWidth = msg.Width
 		return m, nil
 
-	case logMsg:
+	case LogMsg:
 		logStage := m.Stages[m.ActiveIndex]
 		logStage.Logs = append(logStage.Logs, msg.LogLine)
 		m.Stages[m.ActiveIndex] = logStage
 
 		return m, nil
 
-	case errorMsg:
+	case ErrorMsg:
 		logStage := m.Stages[m.ActiveIndex]
 		logStage.HasError = true
 		if msg.ErrorStr != "" {
 			logStage.Logs = append(logStage.Logs, msg.ErrorStr)
-			time.Sleep(time.Millisecond * 100)
 		}
 		m.Stages[m.ActiveIndex] = logStage
 
 		return m, tea.Quit
 
-	case nextStageMsg:
+	case NextStageMsg:
 		m.ActiveIndex = m.ActiveIndex + 1
 
 		return m, m.Stages[m.ActiveIndex].Spinner.Tick
 
-	case allDoneMsg:
+	case AllDoneMsg:
 		m.AllDone = true
 		m.URL = msg.URL
 		m.Duration = msg.Duration
@@ -92,11 +90,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m model) View() string {
+func (m TuiModel) View() string {
 	var s string
 	printSlice := []string{}
 
-	printSlice = append(printSlice, getBannerStyle(m).Render("Deploying a new version of your app 😏"))
+	printSlice = append(printSlice, getBannerStyle(m).Render(m.BannerMsg))
 
 	var logs string
 	for _, res := range m.Stages[m.ActiveIndex].Logs {
@@ -157,7 +155,7 @@ func (m model) View() string {
 	return appStyle.Render(s)
 }
 
-func getLogContainerStyle(m model) lipgloss.Style {
+func getLogContainerStyle(m TuiModel) lipgloss.Style {
 	return lipgloss.
 		NewStyle().
 		Width(int(0.8 * float64(m.ViewportWidth))).
@@ -167,7 +165,7 @@ func getLogContainerStyle(m model) lipgloss.Style {
 		BorderForeground(lipgloss.Color("69")).
 		Foreground(lipgloss.Color("white")).Faint(true)
 }
-func getBannerStyle(m model) lipgloss.Style {
+func getBannerStyle(m TuiModel) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("white")).
 		Background(lipgloss.Color("#414868")).
@@ -178,14 +176,14 @@ func getBannerStyle(m model) lipgloss.Style {
 		MarginTop(1)
 }
 
-func makeStage(title string, success string, hasLogs bool) stage {
+func MakeStage(title string, success string, hasLogs bool) Stage {
 	s := spinner.New()
 	s.Style = spinnerStyle
 	s.Spinner = spinner.MiniDot
 
 	logs := []string{}
 
-	return stage{
+	return Stage{
 		Spinner: s,
 		Title:   title,
 		Success: success,
@@ -194,12 +192,12 @@ func makeStage(title string, success string, hasLogs bool) stage {
 	}
 }
 
-func sendLogsToTUI(source io.ReadCloser, p *tea.Program) {
+func SendLogsToTUI(source io.ReadCloser, p *tea.Program) {
 	scanner := bufio.NewScanner(source)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line != "\n\n" {
-			p.Send(logMsg{LogLine: scanner.Text() + "\n"})
+		if line != "\n" {
+			p.Send(LogMsg{LogLine: scanner.Text() + "\n"})
 			time.Sleep(time.Millisecond * 50)
 		}
 	}

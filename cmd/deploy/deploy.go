@@ -57,16 +57,17 @@ It assumes that your VPS is already configured and that your application is read
 			os.Exit(1)
 		}
 
-		cmdStages := []stage{
-			makeStage("Validating connection with VPS", "VPS is reachable", false),
-			makeStage("Updating secrets if needed", "Env file check complete", false),
-			makeStage("Building latest docker image of your app", "Latest docker image built", true),
-			makeStage("Saving docker image locally", "Image saved successfully", false),
-			makeStage("Moving image to your server", "Image moved and loaded successfully", false),
-			makeStage("Deploying a new version of your application", "Deployed new version successfully", false),
+		cmdStages := []render.Stage{
+			render.MakeStage("Validating connection with VPS", "VPS is reachable", false),
+			render.MakeStage("Updating secrets if needed", "Env file check complete", false),
+			render.MakeStage("Building latest docker image of your app", "Latest docker image built", true),
+			render.MakeStage("Saving docker image locally", "Image saved successfully", false),
+			render.MakeStage("Moving image to your server", "Image moved and loaded successfully", false),
+			render.MakeStage("Deploying a new version of your application", "Deployed new version successfully", false),
 		}
-		p := tea.NewProgram(model{
+		p := tea.NewProgram(render.TuiModel{
 			Stages:      cmdStages,
+			BannerMsg:   "Deploying a new env of your app 😎",
 			ActiveIndex: 0,
 			Quitting:    false,
 			AllDone:     false,
@@ -85,16 +86,16 @@ It assumes that your VPS is already configured and that your application is read
 		go func() {
 			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
 			if err != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			envFileChanged := false
 			currentEnvFileHash := ""
 			if appConfig.Env.File != "" {
 				envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", appConfig.Env.File))
 				if envFileErr != nil {
-					p.Send(errorMsg{ErrorStr: envFileErr.Error()})
+					p.Send(render.ErrorMsg{ErrorStr: envFileErr.Error()})
 				}
 				currentEnvFileHash = fmt.Sprintf("%x", md5.Sum(envFileContent))
 				envFileChanged = appConfig.Env.Hash != currentEnvFileHash
@@ -103,61 +104,61 @@ It assumes that your VPS is already configured and that your application is read
 					envCmd := exec.Command("sh", "-s", "-", viper.GetString("publicKey"), fmt.Sprintf("./%s", appConfig.Env.File))
 					envCmd.Stdin = strings.NewReader(utils.EnvEncryptionScript)
 					envCmdErrPipe, _ := envCmd.StderrPipe()
-					go sendLogsToTUI(envCmdErrPipe, p)
+					go render.SendLogsToTUI(envCmdErrPipe, p)
 					if envCmdErr := envCmd.Run(); envCmdErr != nil {
-						p.Send(errorMsg{ErrorStr: envCmdErr.Error()})
+						p.Send(render.ErrorMsg{ErrorStr: envCmdErr.Error()})
 					}
 					encryptSyncCmd := exec.Command("rsync", "-v", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfig.Name)))
 					encryptSyncCmdErrPipe, _ := encryptSyncCmd.StderrPipe()
-					go sendLogsToTUI(encryptSyncCmdErrPipe, p)
+					go render.SendLogsToTUI(encryptSyncCmdErrPipe, p)
 					if encryptSyncCmdErr := encryptSyncCmd.Run(); encryptSyncCmdErr != nil {
-						p.Send(errorMsg{ErrorStr: encryptSyncCmdErr.Error()})
+						p.Send(render.ErrorMsg{ErrorStr: encryptSyncCmdErr.Error()})
 						time.Sleep(time.Millisecond * 200)
 					}
 				}
 			}
 			defer os.Remove("encrypted.env")
 
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			cwd, _ := os.Getwd()
 			imgFileName := fmt.Sprintf("%s-latest.tar", appConfig.Name)
 			dockerBuildCmd := exec.Command("docker", "build", "--tag", appConfig.Name, "--progress=plain", "--platform=linux/amd64", cwd)
 			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
-			go sendLogsToTUI(dockerBuildCmdErrPipe, p)
+			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 
 			if dockerBuildErr := dockerBuildCmd.Run(); dockerBuildErr != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appConfig.Name)
 			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
-			go sendLogsToTUI(imgSaveCmdErrPipe, p)
+			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
 
 			if imgSaveCmdErr := imgSaveCmd.Run(); imgSaveCmdErr != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
 
 			time.Sleep(time.Millisecond * 200)
 
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appConfig.Name)
 			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
 			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
-			go sendLogsToTUI(imgMoveCmdErrorPipe, p)
+			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
 
 			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
-				p.Send(errorMsg{})
+				p.Send(render.ErrorMsg{})
 			}
 			defer os.Remove(imgFileName)
 
 			time.Sleep(time.Millisecond * 200)
-			p.Send(nextStageMsg{})
+			p.Send(render.NextStageMsg{})
 
 			dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appConfig.Name, appConfig.Name))
 			if sessionErr != nil {
@@ -165,7 +166,7 @@ It assumes that your VPS is already configured and that your application is read
 			}
 
 			go func() {
-				p.Send(logMsg{LogLine: <-dockerLoadOutChan + "\n"})
+				p.Send(render.LogMsg{LogLine: <-dockerLoadOutChan + "\n"})
 				time.Sleep(time.Millisecond * 100)
 			}()
 
@@ -176,7 +177,7 @@ It assumes that your VPS is already configured and that your application is read
 					panic(sessionErr)
 				}
 				go func() {
-					p.Send(logMsg{LogLine: <-runVersionOutChan + "\n"})
+					p.Send(render.LogMsg{LogLine: <-runVersionOutChan + "\n"})
 					time.Sleep(time.Millisecond * 100)
 				}()
 			} else {
@@ -186,7 +187,7 @@ It assumes that your VPS is already configured and that your application is read
 					panic(sessionErr)
 				}
 				go func() {
-					p.Send(logMsg{LogLine: <-runOutChan + "\n"})
+					p.Send(render.LogMsg{LogLine: <-runOutChan + "\n"})
 				}()
 				time.Sleep(time.Second * 2)
 			}
@@ -196,7 +197,7 @@ It assumes that your VPS is already configured and that your application is read
 				log.Fatal("Issue happened cleaning up the image file")
 			}
 			go func() {
-				p.Send(logMsg{LogLine: <-cleanOutChan + "\n"})
+				p.Send(render.LogMsg{LogLine: <-cleanOutChan + "\n"})
 				time.Sleep(time.Millisecond * 100)
 			}()
 
@@ -211,7 +212,7 @@ It assumes that your VPS is already configured and that your application is read
 			os.WriteFile("./sidekick.yml", ymlData, 0644)
 
 			time.Sleep(time.Millisecond * 500)
-			p.Send(allDoneMsg{Duration: time.Since(start), URL: appConfig.Url})
+			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: appConfig.Url})
 		}()
 
 		if _, err := p.Run(); err != nil {

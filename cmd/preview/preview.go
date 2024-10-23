@@ -15,20 +15,18 @@ limitations under the License.
 package preview
 
 import (
-	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	teaLog "github.com/charmbracelet/log"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/log"
 	previewList "github.com/mightymoud/sidekick/cmd/preview/list"
 	previewRemove "github.com/mightymoud/sidekick/cmd/preview/remove"
 	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -39,20 +37,22 @@ var PreviewCmd = &cobra.Command{
 	Short: "Deploy a preview environment for your application",
 	Long:  `Sidekick allows you to deploy preview environment based on commit hash`,
 	Run: func(cmd *cobra.Command, args []string) {
+		start := time.Now()
+
 		if configErr := utils.ViperInit(); configErr != nil {
-			pterm.Error.Println("Sidekick config not found - Run sidekick init")
-			os.Exit(1)
+			render.GetLogger(log.Options{Prefix: "Sidekick Config"}).Fatalf("%s", configErr)
 		}
 		appConfig, appConfigErr := utils.LoadAppConfig()
 		if appConfigErr != nil {
-			log.Fatalln("Unable to load your config file. Might be corrupted")
+			render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Error("Sidekick config exits in this project.")
+			render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Info("You can deploy a new version of your application with Sidekick deploy.")
 			os.Exit(1)
 		}
 
 		if viper.GetString("secretKey") == "" {
-			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
-			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
-			render.GetLogger(teaLog.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
+			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
+			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
+			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
 			os.Exit(1)
 		}
 
@@ -60,8 +60,7 @@ var PreviewCmd = &cobra.Command{
 		gitTreeCheck.Stdin = strings.NewReader(utils.CheckGitTreeScript)
 		output, _ := gitTreeCheck.Output()
 		if string(output) != "all good\n" {
-			fmt.Println(string(output))
-			pterm.Error.Println("Please commit any changes to git before deploying a preview environment")
+			render.GetLogger(log.Options{Prefix: "Preview Cmd"}).Error("Please commit any changes to git before deploying a preview environment")
 			os.Exit(1)
 		}
 
@@ -69,148 +68,190 @@ var PreviewCmd = &cobra.Command{
 		gitShortHashCmd.Stdin = strings.NewReader("git rev-parse --short HEAD")
 		hashOutput, hashErr := gitShortHashCmd.Output()
 		if hashErr != nil {
-			panic(hashErr)
+			render.GetLogger(log.Options{Prefix: "Preview Cmd"}).Error("Issue occurred getting git commit hash: %s", hashErr)
+			os.Exit(1)
 		}
-		deployHash := string(hashOutput)
-		deployHash = strings.TrimSuffix(deployHash, "\n")
+		deployHash := strings.TrimSuffix(string(hashOutput), "\n")
 
-		pterm.Println()
-		pterm.DefaultHeader.WithFullWidth().Println("Deploying a preview env of your app 😎")
-		pterm.Println()
-
-		multi := pterm.DefaultMultiPrinter
-		loginSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Logging into VPS")
-		dockerBuildStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Building latest docker image of your app")
-		deployStageSpinner, _ := utils.GetSpinner().WithWriter(multi.NewWriter()).Start("Deploying a preview env of your application")
-
-		multi.Start()
-
-		loginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
-		if err != nil {
-			loginSpinner.Fail("Something went wrong logging in to your VPS")
-			panic(err)
+		cmdStages := []render.Stage{
+			render.MakeStage("Validating connection with VPS", "VPS is reachable", false),
+			render.MakeStage("Building latest docker image of your app", "Latest docker image built", true),
+			render.MakeStage("Saving docker image locally", "Image saved successfully", false),
+			render.MakeStage("Moving image to your server", "Image moved and loaded successfully", false),
+			render.MakeStage("Deploying a preview env of your application", "Preview env setup successfully", false),
 		}
-		loginSpinner.Success("Logged in successfully!")
+		p := tea.NewProgram(render.TuiModel{
+			Stages:      cmdStages,
+			BannerMsg:   "Deploying a preview env of your app 😎",
+			ActiveIndex: 0,
+			Quitting:    false,
+			AllDone:     false,
+		})
 
-		dockerBuildStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-
-		envVariables := []string{}
-		dockerEnvProperty := []string{}
-		envFileChecksum := ""
-		if appConfig.Env.File != "" {
-			envErr := utils.HandleEnvFile(appConfig.Env.File, envVariables, &dockerEnvProperty, &envFileChecksum)
-			if envErr != nil {
-				panic(envErr)
+		go func() {
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+			if err != nil {
+				p.Send(render.ErrorMsg{})
 			}
-		}
-		defer os.Remove("encrypted.env")
+			p.Send(render.NextStageMsg{})
 
-		imageName := fmt.Sprintf("%s:%s", appConfig.Name, deployHash)
-		serviceName := fmt.Sprintf("%s-%s", appConfig.Name, deployHash)
-		previewURL := fmt.Sprintf("%s.%s", deployHash, appConfig.Url)
-		newService := utils.DockerService{
-			Image: imageName,
-			Labels: []string{
-				"traefik.enable=true",
-				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", serviceName, previewURL),
-				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", serviceName, fmt.Sprint(appConfig.Port)),
-				fmt.Sprintf("traefik.http.routers.%s.tls=true", serviceName),
-				fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=default", serviceName),
-				"traefik.docker.network=sidekick",
-			},
-			Environment: dockerEnvProperty,
-			Networks: []string{
-				"sidekick",
-			},
-		}
-		newDockerCompose := utils.DockerComposeFile{
-			Services: map[string]utils.DockerService{
-				serviceName: newService,
-			},
-			Networks: map[string]utils.DockerNetwork{
-				"sidekick": {
-					External: true,
+			envVariables := []string{}
+			dockerEnvProperty := []string{}
+			envFileChecksum := ""
+			if appConfig.Env.File != "" {
+				envErr := utils.HandleEnvFile(appConfig.Env.File, envVariables, &dockerEnvProperty, &envFileChecksum)
+				if envErr != nil {
+					panic(envErr)
+				}
+			}
+			defer os.Remove("encrypted.env")
+
+			imageName := fmt.Sprintf("%s:%s", appConfig.Name, deployHash)
+			serviceName := fmt.Sprintf("%s-%s", appConfig.Name, deployHash)
+			previewURL := fmt.Sprintf("%s.%s", deployHash, appConfig.Url)
+			newService := utils.DockerService{
+				Image: imageName,
+				Labels: []string{
+					"traefik.enable=true",
+					fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", serviceName, previewURL),
+					fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", serviceName, fmt.Sprint(appConfig.Port)),
+					fmt.Sprintf("traefik.http.routers.%s.tls=true", serviceName),
+					fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=default", serviceName),
+					"traefik.docker.network=sidekick",
 				},
-			},
-		}
-		dockerComposeFile, err := yaml.Marshal(&newDockerCompose)
-		if err != nil {
-			fmt.Printf("Error marshalling YAML: %v\n", err)
-			return
-		}
-		err = os.WriteFile("docker-compose.yaml", dockerComposeFile, 0644)
-		if err != nil {
-			fmt.Printf("Error writing file: %v\n", err)
-			return
-		}
-		defer os.Remove("docker-compose.yaml")
+				Environment: dockerEnvProperty,
+				Networks: []string{
+					"sidekick",
+				},
+			}
+			newDockerCompose := utils.DockerComposeFile{
+				Services: map[string]utils.DockerService{
+					serviceName: newService,
+				},
+				Networks: map[string]utils.DockerNetwork{
+					"sidekick": {
+						External: true,
+					},
+				},
+			}
+			dockerComposeFile, err := yaml.Marshal(&newDockerCompose)
+			if err != nil {
+				fmt.Printf("Error marshalling YAML: %v\n", err)
+				return
+			}
+			err = os.WriteFile("docker-compose.yaml", dockerComposeFile, 0644)
+			if err != nil {
+				fmt.Printf("Error writing file: %v\n", err)
+				return
+			}
+			defer os.Remove("docker-compose.yaml")
 
-		cwd, _ := os.Getwd()
-		var stdErrBuff bytes.Buffer
-		dockerBuildCommd := exec.Command("sh", "-s", "-", appConfig.Name, cwd, deployHash)
-		dockerBuildCommd.Stdin = strings.NewReader(utils.DockerBuildAndSaveScript)
-		dockerBuildCommd.Stderr = &stdErrBuff
-		if dockerBuildErr := dockerBuildCommd.Run(); dockerBuildErr != nil {
-			pterm.Error.Printfln("Failed to build docker image with the following error: \n%s", stdErrBuff.String())
+			cwd, _ := os.Getwd()
+			dockerImage := fmt.Sprintf("%s:%s", appConfig.Name, deployHash)
+			dockerBuildCmd := exec.Command("docker", "build", "--tag", dockerImage, "--progress=plain", "--platform=linux/amd64", cwd)
+			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
+			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
+
+			if dockerBuildErr := dockerBuildCmd.Run(); dockerBuildErr != nil {
+				p.Send(render.ErrorMsg{})
+			}
+
+			time.Sleep(time.Millisecond * 100)
+
+			p.Send(render.NextStageMsg{})
+
+			imgFileName := fmt.Sprintf("%s-%s.tar", appConfig.Name, deployHash)
+			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, dockerImage)
+			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
+			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
+
+			if imgSaveCmdErr := imgSaveCmd.Run(); imgSaveCmdErr != nil {
+				p.Send(render.ErrorMsg{})
+			}
+
+			time.Sleep(time.Millisecond * 100)
+
+			p.Send(render.NextStageMsg{})
+
+			_, _, sessionErr0 := utils.RunCommand(sshClient, fmt.Sprintf(`mkdir -p %s/preview/%s`, appConfig.Name, deployHash))
+			if sessionErr0 != nil {
+				p.Send(render.ErrorMsg{ErrorStr: sessionErr0.Error()})
+			}
+
+			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appConfig.Name)
+			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
+			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
+			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
+
+			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
+				p.Send(render.ErrorMsg{})
+			}
+			defer os.Remove(imgFileName)
+
+			time.Sleep(time.Millisecond * 200)
+
+			dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s && rm %s", appConfig.Name, imgFileName, imgFileName))
+			go func() {
+				p.Send(render.LogMsg{LogLine: <-dockerLoadOutChan + "\n"})
+				time.Sleep(time.Millisecond * 50)
+			}()
+			if sessionErr != nil {
+				time.Sleep(time.Millisecond * 100)
+				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
+			}
+
+			time.Sleep(time.Millisecond * 100)
+			p.Send(render.NextStageMsg{})
+
+			previewFolder := fmt.Sprintf("./%s/preview/%s", appConfig.Name, deployHash)
+			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), previewFolder))
+			rsyncCmErr := rsyncCmd.Run()
+			if rsyncCmErr != nil {
+				p.Send(render.ErrorMsg{ErrorStr: rsyncCmErr.Error()})
+			}
+
+			if appConfig.Env.File != "" {
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), previewFolder))
+				encryptSyncErrr := encryptSync.Run()
+				if encryptSyncErrr != nil {
+					p.Send(render.ErrorMsg{ErrorStr: encryptSyncErrr.Error()})
+				}
+
+				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, previewFolder, viper.GetString("secretKey")))
+				go func() {
+					p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
+					time.Sleep(time.Millisecond * 50)
+				}()
+				if sessionErr1 != nil {
+					p.Send(render.ErrorMsg{ErrorStr: sessionErr1.Error()})
+				}
+			} else {
+				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, previewFolder))
+				go func() {
+					p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
+					time.Sleep(time.Millisecond * 50)
+				}()
+				if sessionErr1 != nil {
+					p.Send(render.ErrorMsg{ErrorStr: sessionErr1.Error()})
+				}
+			}
+			previewEnvConfig := utils.SidekickPreview{
+				Url:       fmt.Sprintf("https://%s", previewURL),
+				Image:     imageName,
+				CreatedAt: time.Now().Format(time.UnixDate),
+			}
+			appConfig.PreviewEnvs = map[string]utils.SidekickPreview{}
+			appConfig.PreviewEnvs[deployHash] = previewEnvConfig
+
+			ymlData, _ := yaml.Marshal(&appConfig)
+			os.WriteFile("./sidekick.yml", ymlData, 0644)
+			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: previewURL})
+		}()
+
+		if _, err := p.Run(); err != nil {
+			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}
-
-		imgMoveCmd := exec.Command("sh", "-s", "-", appConfig.Name, "sidekick", viper.GetString("serverAddress"), deployHash)
-		imgMoveCmd.Stdin = strings.NewReader(utils.ImageMoveScript)
-		_, imgMoveErr := imgMoveCmd.Output()
-		if imgMoveErr != nil {
-			log.Fatalf("Issue occurred with moving image to your VPS: %s", imgMoveErr)
-			os.Exit(1)
-		}
-		if _, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-%s.tar", appConfig.Name, appConfig.Name, deployHash)); sessionErr != nil {
-			log.Fatal("Issue happened loading docker image")
-		}
-		if _, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-%s.tar", appConfig.Name, deployHash))); sessionErr != nil {
-			log.Fatal("Issue happened cleaning up the image file")
-		}
-
-		dockerBuildStageSpinner.Success("Successfully built and pushed docker image")
-
-		deployStageSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		_, _, sessionErr0 := utils.RunCommand(sshClient, fmt.Sprintf(`mkdir -p %s/preview/%s`, appConfig.Name, deployHash))
-		if sessionErr0 != nil {
-			panic(sessionErr0)
-		}
-		rsync := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s/preview/%s", appConfig.Name, deployHash)))
-		rsync.Run()
-		if appConfig.Env.File != "" {
-			encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s/preview/%s", appConfig.Name, deployHash)))
-			encryptSync.Run()
-
-			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appConfig.Name, deployHash, viper.GetString("secretKey")))
-			if sessionErr1 != nil {
-				panic(sessionErr1)
-			}
-		} else {
-			_, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s/preview/%s && docker compose -p sidekick up -d`, appConfig.Name, deployHash))
-			if sessionErr1 != nil {
-				panic(sessionErr1)
-			}
-		}
-		previewEnvConfig := utils.SidekickPreview{
-			Url:       fmt.Sprintf("https://%s", previewURL),
-			Image:     imageName,
-			CreatedAt: time.Now().Format(time.UnixDate),
-		}
-		appConfig.PreviewEnvs = map[string]utils.SidekickPreview{}
-		appConfig.PreviewEnvs[deployHash] = previewEnvConfig
-
-		ymlData, _ := yaml.Marshal(&appConfig)
-		os.WriteFile("./sidekick.yml", ymlData, 0644)
-
-		deployStageSpinner.Success("Successfully built and pushed docker image")
-		multi.Stop()
-
-		pterm.Println()
-		pterm.Info.Printfln("😎 Access your preview app at: https://%s.%s", deployHash, appConfig.Url)
-		pterm.Println()
-
 	},
 }
 
