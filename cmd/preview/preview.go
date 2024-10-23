@@ -240,7 +240,9 @@ var PreviewCmd = &cobra.Command{
 				Image:     imageName,
 				CreatedAt: time.Now().Format(time.UnixDate),
 			}
-			appConfig.PreviewEnvs = map[string]utils.SidekickPreview{}
+			if len(appConfig.PreviewEnvs) == 0 {
+				appConfig.PreviewEnvs = map[string]utils.SidekickPreview{}
+			}
 			appConfig.PreviewEnvs[deployHash] = previewEnvConfig
 
 			ymlData, _ := yaml.Marshal(&appConfig)

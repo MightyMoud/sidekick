@@ -116,7 +116,7 @@ func deletePreviewEnv(hash string) {
 		log.Fatal("Unable to login to your VPS")
 	}
 
-	_, _, dockerDwnErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s/preview/%s && docker rm -f sidekick-%s-%s-1 && docker rm %s:%s", appConfig.Name, hash, appConfig.Name, hash, appConfig.Name, hash))
+	_, _, dockerDwnErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s/preview/%s && docker rm -f sidekick-%s-%s-1 && docker image rm %s:%s", appConfig.Name, hash, appConfig.Name, hash, appConfig.Name, hash))
 	if dockerDwnErr != nil {
 		log.Fatalf("Issue happened stopping your service: %s", dockerDwnErr)
 	}
