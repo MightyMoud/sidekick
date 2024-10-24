@@ -104,7 +104,6 @@ var PreviewCmd = &cobra.Command{
 					panic(envErr)
 				}
 			}
-			defer os.Remove("encrypted.env")
 
 			imageName := fmt.Sprintf("%s:%s", appConfig.Name, deployHash)
 			serviceName := fmt.Sprintf("%s-%s", appConfig.Name, deployHash)
@@ -144,7 +143,6 @@ var PreviewCmd = &cobra.Command{
 				fmt.Printf("Error writing file: %v\n", err)
 				return
 			}
-			defer os.Remove("docker-compose.yaml")
 
 			cwd, _ := os.Getwd()
 			dockerImage := fmt.Sprintf("%s:%s", appConfig.Name, deployHash)
@@ -186,7 +184,6 @@ var PreviewCmd = &cobra.Command{
 			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
 				p.Send(render.ErrorMsg{})
 			}
-			defer os.Remove(imgFileName)
 
 			time.Sleep(time.Millisecond * 200)
 
@@ -247,6 +244,11 @@ var PreviewCmd = &cobra.Command{
 
 			ymlData, _ := yaml.Marshal(&appConfig)
 			os.WriteFile("./sidekick.yml", ymlData, 0644)
+
+			os.Remove("docker-compose.yaml")
+			os.Remove("encrypted.env")
+			os.Remove(imgFileName)
+
 			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: previewURL})
 		}()
 
