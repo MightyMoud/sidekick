@@ -36,7 +36,7 @@ I'm tired of the complexity involved in hosting my side projects. While some pla
 Using brew:
 
 ```bash
-brew install sidekick
+brew install --formula sidekick
 ```
 
 NOTE: Sidekick uses `brew` later on to handle installing `sops` on your local. So `brew` is a requirement at this point. Sidekick will throw an error if `brew` is not found. You can install `brew` from [here](https://brew.sh/).
