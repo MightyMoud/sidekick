@@ -119,7 +119,8 @@ var LaunchCmd = &cobra.Command{
 		// make a docker service
 		imageName := appName
 		newService := utils.DockerService{
-			Image: imageName,
+			Image:   imageName,
+			Restart: "unless-stopped",
 			Labels: []string{
 				"traefik.enable=true",
 				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", appName, appDomain),

@@ -30,8 +30,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// initCmd represents the init command
-var initCmd = &cobra.Command{
+var InitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Init sidekick CLI and configure your VPS to host your apps",
 	Long: `This command will run you through the setup steps to get sidekick loaded on your VPS.
@@ -311,9 +310,9 @@ func initConfig() {
 }
 
 func init() {
-	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(InitCmd)
 
-	initCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
-	initCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
-	initCmd.Flags().BoolP("yes", "y", false, "Skip all validation prompts")
+	InitCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
+	InitCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
+	InitCmd.Flags().BoolP("yes", "y", false, "Skip all validation prompts")
 }
