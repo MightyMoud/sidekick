@@ -17,6 +17,7 @@ package utils
 import (
 	"bufio"
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -141,8 +142,7 @@ func ViperInit() error {
 
 func LoadAppConfig() (SidekickAppConfig, error) {
 	if !FileExists("./sidekick.yml") {
-		pterm.Error.Println("Sidekick app config not found. Please run sidekick launch first")
-		os.Exit(1)
+		return SidekickAppConfig{}, errors.New("Sidekick app config not found. Please run sidekick launch first")
 	}
 	appConfigFile := SidekickAppConfig{}
 	content, err := os.ReadFile("./sidekick.yml")

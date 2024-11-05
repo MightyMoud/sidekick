@@ -14,16 +14,29 @@ limitations under the License.
 */
 package utils
 
+type DependsOn struct {
+	Condition string `yaml:"condition"`
+}
+
+type Healthcheck struct {
+	Test     []string `yaml:"test"`
+	Interval string   `yaml:"interval"`
+	Timeout  string   `yaml:"timeout"`
+	Retries  int      `yaml:"retries"`
+}
+
 type DockerService struct {
-	Image       string   `yaml:"image"`
-	Command     string   `yaml:"command,omitempty"`
-	Restart     string   `yaml:"restart,omitempty"`
-	Ports       []string `yaml:"ports,omitempty"`
-	Volumes     []string `yaml:"volumes,omitempty"`
-	Labels      []string `yaml:"labels,omitempty"`
-	Networks    []string `yaml:"networks,omitempty"`
-	Environment []string `yaml:"environment,omitempty"`
-	DependsOn   []string `yaml:"depends_on,omitempty"`
+	Image       string               `yaml:"image"`
+	Command     string               `yaml:"command,omitempty"`
+	Restart     string               `yaml:"restart,omitempty"`
+	Ports       []string             `yaml:"ports,omitempty"`
+	Volumes     []string             `yaml:"volumes,omitempty"`
+	Labels      []string             `yaml:"labels,omitempty"`
+	Networks    []string             `yaml:"networks,omitempty"`
+	Environment []string             `yaml:"environment,omitempty"`
+	DependsOn   map[string]DependsOn `yaml:"depends_on,omitempty"`
+	HealthCheck Healthcheck          `yaml:"healthcheck,omitempty"`
+	EntryPoint  string               `yaml:"entrypoint,omitempty"`
 }
 
 type DockerNetwork struct {
