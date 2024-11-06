@@ -71,7 +71,7 @@ func GetTraefikStage(email string) CommandsStage {
 			"git clone https://github.com/mightymoud/sidekick-traefik.git",
 			fmt.Sprintf(`cd sidekick-traefik/traefik && sed -i.bak 's/\$EMAIL/%s/g' traefik.yml && rm traefik.yml.bak`, email),
 			"sudo docker network create sidekick",
-			"cd sidekick-traefik && sudo docker compose -p sidekick -f docker-compose.traefik.yml up -d",
+			"cd sidekick-traefik && sudo docker compose -p sidekick up -d",
 		},
 	}
 }
