@@ -24,7 +24,7 @@ var EnvEncryptionScript = `
 	PUBKEY=$1
 	ENVFILE=$2
 
-	sops encrypt --age $PUBKEY $ENVFILE > encrypted.env
+	sops encrypt --output-type dotenv --age $PUBKEY $ENVFILE > encrypted.env
 	`
 
 var DeployAppWithEnvScript = `
