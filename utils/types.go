@@ -63,13 +63,29 @@ type SidekickPreview struct {
 	CreatedAt string `yaml:"createdAt"`
 }
 
+type SidekickAppDatabaseBackupConfig struct {
+	Target       string `yaml:"target"`
+	BucketName   string `yaml:"bucketName"`
+	BucketPath   string `yaml:"path"`
+	BucketRegion string `yaml:"region"`
+	S3Endpoint   string `yaml:"s3Endpoint"`
+}
+
+type SidekickAppDatabaseConfig struct {
+	Type   string                          `yaml:"type"`
+	DbName string                          `yaml:"databaseName"`
+	Url    string                          `yaml:"url"`
+	Backup SidekickAppDatabaseBackupConfig `yaml:"backup,omitempty"`
+}
+
 type SidekickAppConfig struct {
-	Name        string                     `yaml:"name"`
-	Version     string                     `yaml:"version"`
-	Image       string                     `yaml:"image"`
-	Url         string                     `yaml:"url"`
-	Port        uint64                     `yaml:"port"`
-	CreatedAt   string                     `yaml:"createdAt"`
-	Env         SidekickAppEnvConfig       `yaml:"env,omitempty"`
-	PreviewEnvs map[string]SidekickPreview `yaml:"previewEnvs,omitempty"`
+	Name           string                     `yaml:"name"`
+	Version        string                     `yaml:"version"`
+	Image          string                     `yaml:"image"`
+	Url            string                     `yaml:"url"`
+	Port           uint64                     `yaml:"port"`
+	CreatedAt      string                     `yaml:"createdAt"`
+	Env            SidekickAppEnvConfig       `yaml:"env,omitempty"`
+	DatabaseConfig SidekickAppDatabaseConfig  `yaml:"database,omitempty"`
+	PreviewEnvs    map[string]SidekickPreview `yaml:"previewEnvs,omitempty"`
 }
