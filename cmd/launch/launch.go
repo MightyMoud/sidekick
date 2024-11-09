@@ -68,8 +68,8 @@ var LaunchCmd = &cobra.Command{
 
 		appPort := ""
 		for _, line := range strings.Split(string(res), "\n") {
-			if strings.HasPrefix(line, "EXPOSE") {
-				appPort = line[len(line)-4:]
+			if strings.HasPrefix(line, "EXPOSE ") {
+				appPort = strings.TrimPrefix(line, "EXPOSE ")
 			}
 		}
 
