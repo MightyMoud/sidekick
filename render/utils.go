@@ -26,11 +26,21 @@ import (
 )
 
 func GetDefaultTextInput(prompt string, defaultValue string, placeholder string) *textinput.TextInput {
-	input := textinput.New(prompt)
+	inputPrompt := fmt.Sprintf("%s: ", prompt)
 
-	input.InitialValue = defaultValue
+	if defaultValue != "" {
+		inputPrompt = fmt.Sprintf("%s \033[3m(default: %s)\033[0m: ", prompt, defaultValue)
+	}
+
+	input := textinput.New(inputPrompt)
 	input.Placeholder = placeholder
+	input.InitialValue = ""
+
 	input.InputTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("120"))
+
+	if defaultValue != "" {
+		input.Validate = nil
+	}
 
 	return input
 }
