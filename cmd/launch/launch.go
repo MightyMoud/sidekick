@@ -73,32 +73,10 @@ var LaunchCmd = &cobra.Command{
 			}
 		}
 
-		appName := ""
-		appNameTextInput := render.GetDefaultTextInput("Please enter your app url friendly app name:", appName, "will identify your app containers")
-		appName, appNameTextInputErr := appNameTextInput.RunPrompt()
-		if appNameTextInputErr != nil {
-			render.GetLogger(log.Options{Prefix: "Name Input"}).Fatalf(" %s", appNameTextInputErr)
-		}
-
-		appPortTextInput := render.GetDefaultTextInput("Please enter the port at which the app receives request:", appPort, "")
-		appPort, appPortTextInputErr := appPortTextInput.RunPrompt()
-		if appPortTextInputErr != nil {
-			render.GetLogger(log.Options{Prefix: "Port Input"}).Fatalf(" %s", appPortTextInputErr)
-		}
-
-		appDomain := fmt.Sprintf("%s.%s.sslip.io", appName, viper.Get("serverAddress").(string))
-		appDomainTextInput := render.GetDefaultTextInput("Please enter the domain to point the app to:", appDomain, "must point to your VPS ddress")
-		appDomain, appDomainTextInputErr := appDomainTextInput.RunPrompt()
-		if appDomainTextInputErr != nil {
-			render.GetLogger(log.Options{Prefix: "Domain Input"}).Fatalf(" %s", appDomainTextInputErr)
-		}
-
-		envFileName := ".env"
-		envFileNameTextInput := render.GetDefaultTextInput("Please enter which env file you would like to load", envFileName, "")
-		envFileName, envFileNameTextInputErr := envFileNameTextInput.RunPrompt()
-		if envFileNameTextInputErr != nil {
-			render.GetLogger(log.Options{Prefix: "Env Input"}).Fatalf(" %s", envFileNameTextInputErr)
-		}
+		appName := render.GenerateTextQuestion("Please enter your app url friendly app name", "", "will identify your app containers")
+		appPort = render.GenerateTextQuestion("Please enter the port at which the app receives request", appPort, "")
+		appDomain := render.GenerateTextQuestion("Please enter the domain to point the app to", fmt.Sprintf("%s.%s.sslip.io", appName, viper.Get("serverAddress").(string)), "must point to your VPS address")
+		envFileName := render.GenerateTextQuestion("Please enter which env file you would like to load", ".env", "")
 
 		hasEnvFile := false
 		envVariables := []string{}
