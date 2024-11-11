@@ -86,7 +86,7 @@ var LaunchCmd = &cobra.Command{
 			render.GetLogger(log.Options{Prefix: "Port Input"}).Fatalf(" %s", appPortTextInputErr)
 		}
 
-		appDomain := fmt.Sprintf("%s.%s.sslip.io", appName, viper.Get("serverAddress").(string))
+		appDomain := fmt.Sprintf("%s.%s.sslip.io", appName, viper.GetString("serverAddress"))
 		appDomainTextInput := render.GetDefaultTextInput("Please enter the domain to point the app to:", appDomain, "must point to your VPS ddress")
 		appDomain, appDomainTextInputErr := appDomainTextInput.RunPrompt()
 		if appDomainTextInputErr != nil {
@@ -172,7 +172,7 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
@@ -234,14 +234,14 @@ var LaunchCmd = &cobra.Command{
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
 			rsyncCmErr := rsyncCmd.Run()
 			if rsyncCmErr != nil {
 				p.Send(render.ErrorMsg{ErrorStr: rsyncCmErr.Error()})
 			}
 
 			if hasEnvFile {
-				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
 				encryptSyncErr := encryptSync.Run()
 				if encryptSyncErr != nil {
 					p.Send(render.ErrorMsg{ErrorStr: encryptSyncErr.Error()})

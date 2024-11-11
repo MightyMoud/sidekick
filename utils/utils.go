@@ -174,7 +174,7 @@ func HandleEnvFile(envFileName string, envVariables []string, dockerEnvProperty 
 	}
 	// calculate and store the hash of env file to re-encrypt later on when changed
 	*envFileChecksum = fmt.Sprintf("%x", md5.Sum(envFileContent))
-	envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", envFileName))
+	envCmd := exec.Command("sh", "-s", "-", viper.GetString("publicKey"), fmt.Sprintf("./%s", envFileName))
 	// encrypt and save/override encrypted.env
 	envCmd.Stdin = strings.NewReader(EnvEncryptionScript)
 	if envCmdErr := envCmd.Run(); envCmdErr != nil {
