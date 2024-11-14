@@ -101,13 +101,12 @@ var LaunchCmd = &cobra.Command{
 		}
 
 		hasEnvFile := false
-		envVariables := []string{}
 		dockerEnvProperty := []string{}
 		envFileChecksum := ""
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
 			hasEnvFile = true
 			render.GetLogger(log.Options{Prefix: "Env File"}).Infof("Detected - Loading env vars from %s", envFileName)
-			envHandleErr := utils.HandleEnvFile(envFileName, envVariables, &dockerEnvProperty, &envFileChecksum)
+			envHandleErr := utils.HandleEnvFile(envFileName, &dockerEnvProperty, &envFileChecksum)
 			if envHandleErr != nil {
 				render.GetLogger(log.Options{Prefix: "Env File"}).Fatalf("Something went wrong %s", envHandleErr)
 			}
