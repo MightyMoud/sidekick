@@ -169,6 +169,9 @@ func HandleEnvFile(envFileName string, dockerEnvProperty *[]string, envFileCheck
 	}
 
 	for key := range envMap {
+		if strings.HasPrefix(key, "_") {
+			continue
+		}
 		*dockerEnvProperty = append(*dockerEnvProperty, fmt.Sprintf("%s=${%s}", key, key))
 	}
 	// calculate and store the hash of env file to re-encrypt later on when changed
