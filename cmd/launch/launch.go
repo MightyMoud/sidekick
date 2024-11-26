@@ -68,10 +68,11 @@ var LaunchCmd = &cobra.Command{
 
 		appPort := ""
 		for _, line := range strings.Split(string(res), "\n") {
-			if strings.HasPrefix(line, "EXPOSE") {
-				appPort = line[len(line)-4:]
+			if strings.HasPrefix(line, "EXPOSE ") {
+				appPort = strings.TrimPrefix(line, "EXPOSE ")
 			}
 		}
+
 
 		appName := render.GenerateTextQuestion("Please enter your app url friendly app name", "", "will identify your app containers")
 		appPort = render.GenerateTextQuestion("Please enter the port at which the app receives request", appPort, "")
@@ -79,13 +80,12 @@ var LaunchCmd = &cobra.Command{
 		envFileName := render.GenerateTextQuestion("Please enter which env file you would like to load", ".env", "")
 
 		hasEnvFile := false
-		envVariables := []string{}
 		dockerEnvProperty := []string{}
 		envFileChecksum := ""
 		if utils.FileExists(fmt.Sprintf("./%s", envFileName)) {
 			hasEnvFile = true
 			render.GetLogger(log.Options{Prefix: "Env File"}).Infof("Detected - Loading env vars from %s", envFileName)
-			envHandleErr := utils.HandleEnvFile(envFileName, envVariables, &dockerEnvProperty, &envFileChecksum)
+			envHandleErr := utils.HandleEnvFile(envFileName, &dockerEnvProperty, &envFileChecksum)
 			if envHandleErr != nil {
 				render.GetLogger(log.Options{Prefix: "Env File"}).Fatalf("Something went wrong %s", envHandleErr)
 			}
@@ -150,7 +150,7 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.Get("serverAddress").(string), "sidekick")
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
@@ -212,14 +212,14 @@ var LaunchCmd = &cobra.Command{
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
 			rsyncCmErr := rsyncCmd.Run()
 			if rsyncCmErr != nil {
 				p.Send(render.ErrorMsg{ErrorStr: rsyncCmErr.Error()})
 			}
 
 			if hasEnvFile {
-				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appName)))
+				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
 				encryptSyncErr := encryptSync.Run()
 				if encryptSyncErr != nil {
 					p.Send(render.ErrorMsg{ErrorStr: encryptSyncErr.Error()})

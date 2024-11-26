@@ -19,13 +19,14 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/log"
+	"github.com/joho/godotenv"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -157,24 +158,26 @@ func LoadAppConfig() (SidekickAppConfig, error) {
 	return appConfigFile, nil
 }
 
-func HandleEnvFile(envFileName string, envVariables []string, dockerEnvProperty *[]string, envFileChecksum *string) error {
-	envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", envFileName))
+func HandleEnvFile(envFileName string, dockerEnvProperty *[]string, envFileChecksum *string) error {
+	envFile, envFileErr := os.Open(fmt.Sprintf("./%s", envFileName))
 	if envFileErr != nil {
-		pterm.Error.Println("Unable to process your env file")
+		return envFileErr
 	}
-	for _, line := range strings.Split(string(envFileContent), "\n") {
-		if len(line) == 0 || strings.HasPrefix(line, "#") {
-			continue
-		}
-		envVariables = append(envVariables, strings.Split(line, "=")[0])
+	envMap, envParseErr := godotenv.Parse(envFile)
+	if envParseErr != nil {
+		return envParseErr
 	}
 
-	for _, envVar := range envVariables {
-		*dockerEnvProperty = append(*dockerEnvProperty, fmt.Sprintf("%s=${%s}", envVar, envVar))
+	for key := range envMap {
+		if strings.HasPrefix(key, "_") {
+			continue
+		}
+		*dockerEnvProperty = append(*dockerEnvProperty, fmt.Sprintf("%s=${%s}", key, key))
 	}
 	// calculate and store the hash of env file to re-encrypt later on when changed
-	*envFileChecksum = fmt.Sprintf("%x", md5.Sum(envFileContent))
-	envCmd := exec.Command("sh", "-s", "-", viper.Get("publicKey").(string), fmt.Sprintf("./%s", envFileName))
+	envFileContent, _ := godotenv.Marshal(envMap)
+	*envFileChecksum = fmt.Sprintf("%x", md5.Sum([]byte(envFileContent)))
+	envCmd := exec.Command("sh", "-s", "-", viper.GetString("publicKey"), fmt.Sprintf("./%s", envFileName))
 	// encrypt and save/override encrypted.env
 	envCmd.Stdin = strings.NewReader(EnvEncryptionScript)
 	if envCmdErr := envCmd.Run(); envCmdErr != nil {

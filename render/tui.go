@@ -109,7 +109,7 @@ func (m TuiModel) View() string {
 				if !stage.HasError {
 					printSlice = append(printSlice, stage.Spinner.View()+stage.Title)
 				} else {
-					u := tree.Root("⚠ " + stage.Title).Child(stage.Logs[:1])
+					u := tree.Root("⚠ " + stage.Title).Child(stage.Logs)
 					printSlice = append(printSlice, errorStyle.Render(u.String()))
 				}
 				if stage.HasLogs && !stage.HasError {

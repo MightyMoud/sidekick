@@ -95,11 +95,10 @@ var PreviewCmd = &cobra.Command{
 			}
 			p.Send(render.NextStageMsg{})
 
-			envVariables := []string{}
 			dockerEnvProperty := []string{}
 			envFileChecksum := ""
 			if appConfig.Env.File != "" {
-				envErr := utils.HandleEnvFile(appConfig.Env.File, envVariables, &dockerEnvProperty, &envFileChecksum)
+				envErr := utils.HandleEnvFile(appConfig.Env.File, &dockerEnvProperty, &envFileChecksum)
 				if envErr != nil {
 					panic(envErr)
 				}

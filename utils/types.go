@@ -74,7 +74,6 @@ type SidekickAppDatabaseBackupConfig struct {
 type SidekickAppDatabaseConfig struct {
 	Type   string                          `yaml:"type"`
 	DbName string                          `yaml:"databaseName"`
-	Url    string                          `yaml:"url"`
 	Backup SidekickAppDatabaseBackupConfig `yaml:"backup,omitempty"`
 }
 
