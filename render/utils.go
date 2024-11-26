@@ -15,6 +15,7 @@ limitations under the License.
 package render
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -25,14 +26,39 @@ import (
 	"github.com/pterm/pterm/putils"
 )
 
-func GetDefaultTextInput(prompt string, defaultValue string, placeholder string) *textinput.TextInput {
-	input := textinput.New(prompt)
+func getDefaultTextInput(prompt string, defaultValue string, placeholder string) *textinput.TextInput {
+	inputPrompt := fmt.Sprintf("%s: ", prompt)
 
-	input.InitialValue = defaultValue
+	if defaultValue != "" {
+		inputPrompt = fmt.Sprintf("%s \033[3m(default: %s)\033[0m: ", prompt, defaultValue)
+	}
+
+	input := textinput.New(inputPrompt)
 	input.Placeholder = placeholder
+	input.InitialValue = ""
+
 	input.InputTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("120"))
 
+	if defaultValue != "" {
+		input.Validate = nil
+	}
+
 	return input
+}
+
+func GenerateTextQuestion(question string, defaultAnswer string, placeholder string) string {
+	input := getDefaultTextInput(question, defaultAnswer, placeholder)
+	userAnswer, err := input.RunPrompt()
+
+	if err != nil {
+		GetLogger(log.Options{Prefix: "Input"}).Fatalf(" %s", err)
+	}
+
+	if defaultAnswer != "" && userAnswer == "" {
+		return defaultAnswer
+	}
+
+	return userAnswer
 }
 
 func GetLogger(options log.Options) *log.Logger {
