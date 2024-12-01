@@ -36,7 +36,7 @@ type DockerService struct {
 	Environment []string             `yaml:"environment,omitempty"`
 	DependsOn   map[string]DependsOn `yaml:"depends_on,omitempty"`
 	HealthCheck Healthcheck          `yaml:"healthcheck,omitempty"`
-	EntryPoint  string               `yaml:"entrypoint,omitempty"`
+	EntryPoint  []string             `yaml:"entrypoint,omitempty"`
 }
 
 type DockerNetwork struct {

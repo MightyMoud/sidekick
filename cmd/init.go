@@ -144,7 +144,6 @@ var InitCmd = &cobra.Command{
 
 		_, sopsErr := exec.LookPath("sops")
 		if sopsErr != nil {
-			// log.Println("Sops not found, installing sops")
 			_, err := exec.LookPath("brew")
 			if err != nil {
 				log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", err)
@@ -152,7 +151,7 @@ var InitCmd = &cobra.Command{
 			installSopsCmd := exec.Command("brew", "install", "sops")
 			_, installSopsCmdErr := installSopsCmd.CombinedOutput()
 			if installSopsCmdErr != nil {
-				log.Fatalf("Failed to install Sops. Sops is needed to encrypt your local env: %s", installSopsCmd)
+				log.Fatalf("Failed to install Sops. Sops is needed to encrypt your local env: %s", installSopsCmdErr)
 			}
 		}
 		_, ageErr := exec.LookPath("age")

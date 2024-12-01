@@ -73,7 +73,6 @@ var LaunchCmd = &cobra.Command{
 			}
 		}
 
-
 		appName := render.GenerateTextQuestion("Please enter your app url friendly app name", "", "will identify your app containers")
 		appPort = render.GenerateTextQuestion("Please enter the port at which the app receives request", appPort, "")
 		appDomain := render.GenerateTextQuestion("Please enter the domain to point the app to", fmt.Sprintf("%s.%s.sslip.io", appName, viper.Get("serverAddress").(string)), "must point to your VPS address")
