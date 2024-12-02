@@ -68,8 +68,8 @@ func inspectServerPublicKey(key ssh.PublicKey, hostname string) {
 
 }
 
-func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
-	sshPort := "22"
+func GetSshClient(server string, sshPort string, sshUser string) (*ssh.Client, error) {
+	//sshPort := "22"
 	sshAgentSock := os.Getenv("SSH_AUTH_SOCK")
 	if sshAgentSock == "" {
 		log.Fatal("No SSH SOCK AVAILABLE")
@@ -143,8 +143,8 @@ func GetSshClient(server string, sshUser string) (*ssh.Client, error) {
 	return client, nil
 }
 
-func Login(server string, user string) (*ssh.Client, error) {
-	sshClient, err := GetSshClient(server, user)
+func Login(server string, port string, user string) (*ssh.Client, error) {
+	sshClient, err := GetSshClient(server, port, user)
 	if err != nil {
 		return nil, err
 	}
