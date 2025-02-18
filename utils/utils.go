@@ -185,3 +185,23 @@ func HandleEnvFile(envFileName string, dockerEnvProperty *[]string, envFileCheck
 	}
 	return nil
 }
+
+func writeEnvFile(filename string, env map[string]string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return fmt.Errorf("error openign file: %w", err)
+	}
+	defer f.Close()
+
+	for key, value := range env {
+		// Check if the value contains spaces or special characters
+		// and quote it if needed.  This is important for robustness.
+		if strings.ContainsAny(value, " \t\n\r\"") {
+			value = fmt.Sprintf("\"%s\"", strings.ReplaceAll(value, "\"", "\\\"")) // Escape inner quotes
+		}
+		if _, err := f.WriteString(fmt.Sprintf("%s=%s\n", key, value)); err != nil {
+			return fmt.Errorf("error writing to file: %w", err)
+		}
+	}
+	return nil
+}
