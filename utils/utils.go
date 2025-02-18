@@ -186,7 +186,7 @@ func HandleEnvFile(envFileName string, dockerEnvProperty *[]string, envFileCheck
 	return nil
 }
 
-func writeEnvFile(filename string, env map[string]string) error {
+func WriteEnvFile(filename string, env map[string]string) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("error openign file: %w", err)
