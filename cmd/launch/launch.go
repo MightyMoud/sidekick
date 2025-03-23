@@ -94,7 +94,7 @@ var LaunchCmd = &cobra.Command{
 		}
 
 		// make a docker service
-		imageName := appName
+		imageName := "localhost/" + appName
 		newService := utils.DockerService{
 			Image:   imageName,
 			Restart: "unless-stopped",
@@ -156,7 +156,11 @@ var LaunchCmd = &cobra.Command{
 			p.Send(render.NextStageMsg{})
 
 			cwd, _ := os.Getwd()
-			dockerBuildCmd := exec.Command("docker", "build", "--tag", appName, "--progress=plain", "--platform=linux/amd64", cwd)
+			localContainerProvider := "docker"
+			if utils.CommandExists("podman") {
+				localContainerProvider = "podman"
+			}
+			dockerBuildCmd := exec.Command(localContainerProvider, "build", "--tag", appName, "--progress=plain", "--platform=linux/amd64", cwd)
 			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
 			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 
@@ -169,7 +173,7 @@ var LaunchCmd = &cobra.Command{
 			p.Send(render.NextStageMsg{})
 
 			imgFileName := fmt.Sprintf("%s-latest.tar", appName)
-			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appName)
+			imgSaveCmd := exec.Command(localContainerProvider, "save", "-o", imgFileName, appName)
 			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
 			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
 
