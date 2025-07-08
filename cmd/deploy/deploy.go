@@ -77,6 +77,12 @@ It assumes that your VPS is already configured and that your application is read
 		if loadError != nil {
 			panic(loadError)
 		}
+
+		// Check deployment type
+		if appConfig.DeploymentType == "compose" {
+			deployCompose(appConfig)
+			return
+		}
 		replacer := strings.NewReplacer(
 			"$service_name", appConfig.Name,
 			"$app_port", fmt.Sprint(appConfig.Port),

@@ -205,3 +205,66 @@ func WriteEnvFile(filename string, env map[string]string) error {
 	}
 	return nil
 }
+
+// DetectComposeFile checks for docker-compose.yml or compose.yml and returns the filename if found
+func DetectComposeFile() (string, bool) {
+	composeFiles := []string{"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"}
+	for _, file := range composeFiles {
+		if FileExists(file) {
+			return file, true
+		}
+	}
+	return "", false
+}
+
+// ParseComposeFile reads and parses a docker-compose file
+func ParseComposeFile(filename string) (*DockerComposeFile, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read compose file: %w", err)
+	}
+
+	var compose DockerComposeFile
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		return nil, fmt.Errorf("failed to parse compose file: %w", err)
+	}
+
+	return &compose, nil
+}
+
+// GetServicesWithBuildContext returns services that have a build context defined
+func GetServicesWithBuildContext(compose *DockerComposeFile) map[string]DockerService {
+	servicesWithBuild := make(map[string]DockerService)
+	for name, service := range compose.Services {
+		if service.Build != nil {
+			servicesWithBuild[name] = service
+		}
+	}
+	return servicesWithBuild
+}
+
+// GetServicesWithPorts returns all services that expose ports
+func GetServicesWithPorts(compose *DockerComposeFile) []string {
+	var services []string
+	for name, service := range compose.Services {
+		if len(service.Ports) > 0 {
+			services = append(services, name)
+		}
+	}
+	return services
+}
+
+// ExtractPortFromService extracts the container port from a service's port mapping
+func ExtractPortFromService(service *DockerService) string {
+	if len(service.Ports) == 0 {
+		return ""
+	}
+	
+	// Parse first port mapping (format: "host:container" or just "container")
+	portMapping := service.Ports[0]
+	parts := strings.Split(portMapping, ":")
+	if len(parts) >= 2 {
+		return parts[len(parts)-1] // Return container port
+	}
+	return parts[0] // Return the only part if no colon
+}
