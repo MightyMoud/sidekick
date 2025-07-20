@@ -63,6 +63,10 @@ var InitCmd = &cobra.Command{
 		if emailFlagError != nil {
 			fmt.Println(emailFlagError)
 		}
+		sshProvider, sshProviderFlagErr := cmd.Flags().GetString("ssh-provider")
+		if sshProviderFlagErr != nil {
+			fmt.Println(sshProviderFlagErr)
+		}
 
 		if server == "" {
 			serverTextInput := pterm.DefaultInteractiveTextInput
@@ -81,6 +85,15 @@ var InitCmd = &cobra.Command{
 			if certEmail == "" {
 				pterm.Error.Println("An email is needed before you proceed")
 				os.Exit(0)
+			}
+		}
+
+		if sshProvider == "" {
+			sshProviderTextInput := pterm.DefaultInteractiveTextInput
+			sshProviderTextInput.DefaultText = "Please enter the SSH provider you want to use (default: openSSH, options: 1password, openssh)"
+			sshProvider, _ = sshProviderTextInput.Show()
+			if sshProvider == "" {
+				sshProvider = "openssh"
 			}
 		}
 
@@ -105,6 +118,7 @@ var InitCmd = &cobra.Command{
 
 		viper.Set("serverAddress", server)
 		viper.Set("certEmail", certEmail)
+		viper.Set("sshProvider", sshProvider)
 
 		pterm.Println()
 		pterm.DefaultHeader.WithFullWidth().Println("Sidekick booting up! 🚀")
@@ -116,7 +130,7 @@ var InitCmd = &cobra.Command{
 		users := []string{"root", "sidekick"}
 		canConnect := false
 		for _, user := range users {
-			sshClient, initSessionErr = utils.Login(server, user)
+			sshClient, initSessionErr = utils.Login(server, user, sshProvider)
 			if initSessionErr != nil {
 				continue
 			}
@@ -196,7 +210,7 @@ var InitCmd = &cobra.Command{
 		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
 
 		sidekickLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sidekickSshClient, err := utils.Login(server, "sidekick")
+		sidekickSshClient, err := utils.Login(server, "sidekick", sshProvider)
 		if err != nil {
 			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
 			log.Fatal(err)
