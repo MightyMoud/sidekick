@@ -89,7 +89,7 @@ var PreviewCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"))
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"), viper.GetString("sshPort"))
 			if err != nil {
 				p.Send(render.ErrorMsg{})
 			}

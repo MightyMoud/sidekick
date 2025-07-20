@@ -149,7 +149,7 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"))
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"), viper.GetString("sshPort"))
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
@@ -185,13 +185,13 @@ var LaunchCmd = &cobra.Command{
 
 			p.Send(render.NextStageMsg{})
 
-			_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
+			_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir -p %s", appName))
 			if sessionErr != nil {
 				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
 			}
 
 			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appName)
-			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
+			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist, "-P", viper.GetString("sshPort"))
 			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
 			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
 

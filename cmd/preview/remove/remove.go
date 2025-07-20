@@ -111,7 +111,7 @@ func deletePreviewEnv(hash string) {
 	if appConfigErr != nil {
 		log.Fatalf("Unable to load your config file. Might be corrupted")
 	}
-	sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"))
+	sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"), viper.GetString("sshPort"))
 	if err != nil {
 		log.Fatal("Unable to login to your VPS")
 	}
