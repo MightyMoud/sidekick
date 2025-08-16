@@ -17,7 +17,6 @@ package deploy
 import (
 	"crypto/md5"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -162,7 +161,8 @@ It assumes that your VPS is already configured and that your application is read
 
 			dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s-latest.tar", appConfig.Name, appConfig.Name))
 			if sessionErr != nil {
-				log.Fatal("Issue happened loading docker image")
+				p.Send(render.ErrorMsg{ErrorStr: "Failed to load docker image on server: " + sessionErr.Error()})
+				return
 			}
 
 			go func() {
@@ -171,10 +171,11 @@ It assumes that your VPS is already configured and that your application is read
 			}()
 
 			if appConfig.Env.File != "" {
-				deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
+				deployScript := replacer.Replace(utils.ForceDeployWithEnvScript)
 				_, runVersionOutChan, sessionErr := utils.RunCommand(sshClient, deployScript)
 				if sessionErr != nil {
-					panic(sessionErr)
+					p.Send(render.ErrorMsg{ErrorStr: "Failed to deploy application with environment file: " + sessionErr.Error()})
+					return
 				}
 				go func() {
 					p.Send(render.LogMsg{LogLine: <-runVersionOutChan + "\n"})
@@ -184,7 +185,8 @@ It assumes that your VPS is already configured and that your application is read
 				deployScript := replacer.Replace(utils.DeployAppScript)
 				_, runOutChan, sessionErr := utils.RunCommand(sshClient, deployScript)
 				if sessionErr != nil {
-					panic(sessionErr)
+					p.Send(render.ErrorMsg{ErrorStr: "Failed to deploy application: " + sessionErr.Error()})
+					return
 				}
 				go func() {
 					p.Send(render.LogMsg{LogLine: <-runOutChan + "\n"})
@@ -194,7 +196,8 @@ It assumes that your VPS is already configured and that your application is read
 
 			cleanOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && rm %s", appConfig.Name, fmt.Sprintf("%s-latest.tar", appConfig.Name)))
 			if sessionErr != nil {
-				log.Fatal("Issue happened cleaning up the image file")
+				p.Send(render.ErrorMsg{ErrorStr: "Failed to clean up image file on server: " + sessionErr.Error()})
+				return
 			}
 			go func() {
 				p.Send(render.LogMsg{LogLine: <-cleanOutChan + "\n"})

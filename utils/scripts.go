@@ -40,6 +40,15 @@ var DeployAppWithEnvScript = `
 	sops exec-env encrypted.env 'docker compose -p sidekick up -d --scale $service_name=1 --no-recreate $service_name'
 	`
 
+var ForceDeployWithEnvScript = `
+	export SOPS_AGE_KEY=$age_secret_key && \
+	cd $service_name && \
+	old_container_id=$(docker ps -f label="traefik.enable=true" -q | tail -n1) && \
+	docker stop $old_container_id && \
+	docker rm $old_container_id && \
+	sops exec-env encrypted.env 'docker compose -p sidekick up -d'
+	`
+
 var DeployAppScript = `
 	cd $service_name && \
 	old_container_id=$(docker ps -f name=$service_name -q | tail -n1) && \
