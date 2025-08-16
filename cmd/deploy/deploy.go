@@ -171,7 +171,7 @@ It assumes that your VPS is already configured and that your application is read
 			}()
 
 			if appConfig.Env.File != "" {
-				deployScript := replacer.Replace(utils.ForceDeployWithEnvScript)
+				deployScript := replacer.Replace(utils.DeployAppWithEnvScript)
 				_, runVersionOutChan, sessionErr := utils.RunCommand(sshClient, deployScript)
 				if sessionErr != nil {
 					p.Send(render.ErrorMsg{ErrorStr: "Failed to deploy application with environment file: " + sessionErr.Error()})
