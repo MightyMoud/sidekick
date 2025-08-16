@@ -116,6 +116,7 @@ func (m TuiModel) View() string {
 				} else {
 					u := tree.Root("⚠ " + stage.Title).Child(stage.Logs)
 					printSlice = append(printSlice, errorStyle.Render(u.String()))
+					printSlice = append(printSlice, allDoneStyle.Render("⚠️ Check sidekick.logs.txt for more details"))
 				}
 				if stage.HasLogs && !stage.HasError {
 					var t string
