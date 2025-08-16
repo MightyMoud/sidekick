@@ -25,18 +25,26 @@ type Healthcheck struct {
 	Retries  int      `yaml:"retries"`
 }
 
+type DockerBuildContext struct {
+	Context    string                 `yaml:"context,omitempty"`
+	Dockerfile string                 `yaml:"dockerfile,omitempty"`
+	Args       map[string]interface{} `yaml:"args,omitempty"`
+}
+
 type DockerService struct {
-	Image       string               `yaml:"image"`
-	Command     string               `yaml:"command,omitempty"`
-	Restart     string               `yaml:"restart,omitempty"`
-	Ports       []string             `yaml:"ports,omitempty"`
-	Volumes     []string             `yaml:"volumes,omitempty"`
-	Labels      []string             `yaml:"labels,omitempty"`
-	Networks    []string             `yaml:"networks,omitempty"`
-	Environment []string             `yaml:"environment,omitempty"`
-	DependsOn   map[string]DependsOn `yaml:"depends_on,omitempty"`
-	HealthCheck Healthcheck          `yaml:"healthcheck,omitempty"`
-	EntryPoint  []string             `yaml:"entrypoint,omitempty"`
+	Image       string                 `yaml:"image,omitempty"`
+	Build       *DockerBuildContext    `yaml:"build,omitempty"`
+	Command     string                 `yaml:"command,omitempty"`
+	Restart     string                 `yaml:"restart,omitempty"`
+	Ports       []string               `yaml:"ports,omitempty"`
+	Volumes     []string               `yaml:"volumes,omitempty"`
+	Labels      []string               `yaml:"labels,omitempty"`
+	Networks    []string               `yaml:"networks,omitempty"`
+	Environment interface{}            `yaml:"environment,omitempty"` // Can be []string or map[string]string
+	EnvFile     interface{}            `yaml:"env_file,omitempty"`     // Can be string or []string
+	DependsOn   map[string]DependsOn   `yaml:"depends_on,omitempty"`
+	HealthCheck Healthcheck            `yaml:"healthcheck,omitempty"`
+	EntryPoint  []string               `yaml:"entrypoint,omitempty"`
 }
 
 type DockerNetwork struct {
@@ -80,10 +88,13 @@ type SidekickAppDatabaseConfig struct {
 type SidekickAppConfig struct {
 	Name           string                     `yaml:"name"`
 	Version        string                     `yaml:"version"`
-	Image          string                     `yaml:"image"`
+	Image          string                     `yaml:"image,omitempty"`
 	Url            string                     `yaml:"url"`
 	Port           uint64                     `yaml:"port"`
 	CreatedAt      string                     `yaml:"createdAt"`
+	DeploymentType string                     `yaml:"deploymentType,omitempty"` // "dockerfile" or "compose"
+	ComposeFile    string                     `yaml:"composeFile,omitempty"`
+	MainService    string                     `yaml:"mainService,omitempty"`
 	Env            SidekickAppEnvConfig       `yaml:"env,omitempty"`
 	DatabaseConfig SidekickAppDatabaseConfig  `yaml:"database,omitempty"`
 	PreviewEnvs    map[string]SidekickPreview `yaml:"previewEnvs,omitempty"`

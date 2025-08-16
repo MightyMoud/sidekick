@@ -103,3 +103,35 @@ func RenderKeyValidation(resultLines []string, keyHash string, hostname string) 
 		os.Exit(0)
 	}
 }
+
+func GenerateDeploymentTypeSelection() string {
+	prompt := pterm.DefaultInteractiveSelect.WithOptions([]string{"Docker Compose", "Dockerfile"})
+	prompt.DefaultText = "Both Dockerfile and docker-compose.yml found. Which would you like to use?"
+	prompt.DefaultOption = "Docker Compose"
+	
+	result, err := prompt.Show()
+	if err != nil {
+		GetLogger(log.Options{Prefix: "Input"}).Fatalf(" %s", err)
+	}
+	
+	if result == "Docker Compose" {
+		return "compose"
+	}
+	return "dockerfile"
+}
+
+func GenerateServiceSelection(services []string, defaultService string) string {
+	if len(services) == 1 {
+		return services[0]
+	}
+	
+	prompt := pterm.DefaultInteractiveSelect.WithOptions(services)
+	prompt.DefaultText = "Please select which service should receive web traffic"
+	
+	result, err := prompt.Show()
+	if err != nil {
+		GetLogger(log.Options{Prefix: "Input"}).Fatalf(" %s", err)
+	}
+	
+	return result
+}

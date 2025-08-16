@@ -36,8 +36,6 @@ var LaunchCmd = &cobra.Command{
 	Short: "Launch a new application to host on your VPS with Sidekick",
 	Long:  `This command will run you through the basic setup to add a new application to your VPS.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		start := time.Now()
-
 		if configErr := utils.ViperInit(); configErr != nil {
 			render.GetLogger(log.Options{Prefix: "Sidekick Config"}).Fatalf("%s", configErr)
 		}
@@ -55,11 +53,37 @@ var LaunchCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if utils.FileExists("./Dockerfile") {
+		// Check for compose file
+		composeFile, hasCompose := utils.DetectComposeFile()
+		hasDockerfile := utils.FileExists("./Dockerfile")
+
+		// Determine deployment type
+		var deploymentType string
+		if hasCompose && hasDockerfile {
+			// Both exist, ask user
+			render.GetLogger(log.Options{Prefix: "Deploy Detection"}).Info("Found both Dockerfile and docker-compose.yml")
+			deploymentType = render.GenerateDeploymentTypeSelection()
+		} else if hasCompose {
+			// Only compose exists
+			deploymentType = "compose"
+			render.GetLogger(log.Options{Prefix: "Docker Compose"}).Infof("Detected %s - using compose deployment", composeFile)
+		} else if hasDockerfile {
+			// Only Dockerfile exists
+			deploymentType = "dockerfile"
 			render.GetLogger(log.Options{Prefix: "Dockerfile"}).Info("Detected - scanning file for details")
 		} else {
-			render.GetLogger(log.Options{Prefix: "Dockerfile"}).Fatal("No dockerfile found in current directory.")
+			// Neither exists
+			render.GetLogger(log.Options{Prefix: "Deploy Detection"}).Fatal("No Dockerfile or docker-compose.yml found in current directory.")
 		}
+
+		// Launch based on deployment type
+		if deploymentType == "compose" {
+			launchCompose(composeFile)
+			return
+		}
+
+		// Original Dockerfile deployment logic continues below
+		start := time.Now()
 
 		res, err := os.ReadFile("./Dockerfile")
 		if err != nil {
