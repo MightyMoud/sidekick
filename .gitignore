@@ -1,3 +1,5 @@
 
 dist/
 .DS_Store
+testServer/*
+default.yaml
