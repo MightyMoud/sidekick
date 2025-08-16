@@ -16,7 +16,10 @@ package render
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -66,6 +69,8 @@ func (m TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			logStage.Logs = append(logStage.Logs, msg.ErrorStr)
 		}
 		m.Stages[m.ActiveIndex] = logStage
+
+		WriteStageLogs(logStage, m.ActiveIndex)
 
 		return m, tea.Quit
 
@@ -201,4 +206,44 @@ func SendLogsToTUI(source io.ReadCloser, p *tea.Program) {
 			time.Sleep(time.Millisecond * 50)
 		}
 	}
+}
+
+// WriteStageLogs writes the logs from a specific stage to sidekick.logs.txt
+func WriteStageLogs(stage Stage, stageIndex int) error {
+	if len(stage.Logs) == 0 {
+		return nil
+	}
+
+	file, err := os.OpenFile("sidekick.logs.txt", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	header := fmt.Sprintf("\n=== STAGE %d ERROR LOG - %s ===\n", stageIndex+1, timestamp)
+	header += fmt.Sprintf("Stage: %s\n", stage.Title)
+	header += "=== LOGS START ===\n"
+
+	if _, err := file.WriteString(header); err != nil {
+		return err
+	}
+
+	for _, log := range stage.Logs {
+		if _, err := file.WriteString(log); err != nil {
+			return err
+		}
+		if !strings.HasSuffix(log, "\n") {
+			if _, err := file.WriteString("\n"); err != nil {
+				return err
+			}
+		}
+	}
+
+	footer := "=== LOGS END ===\n\n"
+	if _, err := file.WriteString(footer); err != nil {
+		return err
+	}
+
+	return nil
 }

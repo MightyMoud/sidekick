@@ -85,7 +85,8 @@ It assumes that your VPS is already configured and that your application is read
 		go func() {
 			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
 			if err != nil {
-				p.Send(render.ErrorMsg{})
+				p.Send(render.ErrorMsg{ErrorStr: "Failed to connect to VPS: " + err.Error()})
+				return
 			}
 			p.Send(render.NextStageMsg{})
 
@@ -94,7 +95,8 @@ It assumes that your VPS is already configured and that your application is read
 			if appConfig.Env.File != "" {
 				envFileContent, envFileErr := os.ReadFile(fmt.Sprintf("./%s", appConfig.Env.File))
 				if envFileErr != nil {
-					p.Send(render.ErrorMsg{ErrorStr: envFileErr.Error()})
+					p.Send(render.ErrorMsg{ErrorStr: "Failed to read environment file: " + envFileErr.Error()})
+					return
 				}
 				currentEnvFileHash = fmt.Sprintf("%x", md5.Sum(envFileContent))
 				envFileChanged = appConfig.Env.Hash != currentEnvFileHash
@@ -105,14 +107,15 @@ It assumes that your VPS is already configured and that your application is read
 					envCmdErrPipe, _ := envCmd.StderrPipe()
 					go render.SendLogsToTUI(envCmdErrPipe, p)
 					if envCmdErr := envCmd.Run(); envCmdErr != nil {
-						p.Send(render.ErrorMsg{ErrorStr: envCmdErr.Error()})
+						p.Send(render.ErrorMsg{ErrorStr: "Failed to encrypt environment file: " + envCmdErr.Error()})
+						return
 					}
 					encryptSyncCmd := exec.Command("rsync", "-v", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.Get("serverAddress").(string), fmt.Sprintf("./%s", appConfig.Name)))
 					encryptSyncCmdErrPipe, _ := encryptSyncCmd.StderrPipe()
 					go render.SendLogsToTUI(encryptSyncCmdErrPipe, p)
 					if encryptSyncCmdErr := encryptSyncCmd.Run(); encryptSyncCmdErr != nil {
-						p.Send(render.ErrorMsg{ErrorStr: encryptSyncCmdErr.Error()})
-						time.Sleep(time.Millisecond * 200)
+						p.Send(render.ErrorMsg{ErrorStr: "Failed to sync encrypted environment file to server: " + encryptSyncCmdErr.Error()})
+						return
 					}
 				}
 			}
@@ -127,7 +130,8 @@ It assumes that your VPS is already configured and that your application is read
 			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 
 			if dockerBuildErr := dockerBuildCmd.Run(); dockerBuildErr != nil {
-				p.Send(render.ErrorMsg{})
+				p.Send(render.ErrorMsg{ErrorStr: "Failed to build Docker image: " + dockerBuildErr.Error()})
+				return
 			}
 
 			time.Sleep(time.Millisecond * 100)
@@ -139,7 +143,8 @@ It assumes that your VPS is already configured and that your application is read
 			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
 
 			if imgSaveCmdErr := imgSaveCmd.Run(); imgSaveCmdErr != nil {
-				p.Send(render.ErrorMsg{})
+				p.Send(render.ErrorMsg{ErrorStr: "Failed to save Docker image: " + imgSaveCmdErr.Error()})
+				return
 			}
 
 			time.Sleep(time.Millisecond * 200)
@@ -152,7 +157,8 @@ It assumes that your VPS is already configured and that your application is read
 			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
 
 			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
-				p.Send(render.ErrorMsg{})
+				p.Send(render.ErrorMsg{ErrorStr: "Failed to move Docker image to server: " + imgMovCmdErr.Error()})
+				return
 			}
 			defer os.Remove(imgFileName)
 
