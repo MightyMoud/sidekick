@@ -37,7 +37,7 @@ var DeployAppWithEnvScript = `
 	curl --silent --include --retry-connrefused --retry 30 --retry-delay 1 --fail http://$new_container_ip:$app_port/up || exit 1 && \
 	docker stop $old_container_id && \
 	docker rm $old_container_id && \
-	sops exec-env encrypted.env 'docker compose -p sidekick up -d --scale $service_name=1 --no-recreate $service_name'
+	sops exec-env encrypted.env 'docker compose -p sidekick up -d --scale $service_name=1 --no-recreate $service_name --remove-orphans'
 	`
 
 var ForceDeployWithEnvScript = `
@@ -58,7 +58,7 @@ var DeployAppScript = `
 	curl --silent --include --retry-connrefused --retry 30 --retry-delay 1 --fail http://$new_container_ip:$app_port/up || exit 1 && \
 	docker stop $old_container_id && \
 	docker rm $old_container_id && \
-	docker compose -p sidekick up -d --scale $service_name=1 --no-recreate $service_name
+	docker compose -p sidekick up -d --scale $service_name=1 --no-recreate $service_name --remove-orphans
 	`
 
 var CheckGitTreeScript = `
