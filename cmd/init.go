@@ -59,9 +59,21 @@ var InitCmd = &cobra.Command{
 		if serverFlagErr != nil {
 			fmt.Println(serverFlagErr)
 		}
+
+		port, portFlagErr := cmd.Flags().GetString("ssh-port")
+		if portFlagErr != nil {
+			fmt.Println(portFlagErr)
+			port = "22"
+		}
+
 		certEmail, emailFlagError := cmd.Flags().GetString("email")
 		if emailFlagError != nil {
 			fmt.Println(emailFlagError)
+		}
+		sshProvider, sshProviderFlagErr := cmd.Flags().GetString("ssh-provider")
+		if sshProviderFlagErr != nil {
+			fmt.Println(sshProviderFlagErr)
+			sshProvider = "openssh"
 		}
 
 		if server == "" {
@@ -74,6 +86,17 @@ var InitCmd = &cobra.Command{
 			}
 		}
 
+		wasPortProvided := cmd.Flags().Changed("ssh-port")
+		if !wasPortProvided {
+			portTextInput := pterm.DefaultInteractiveTextInput
+			portTextInput.DefaultText = "Please enter the SSH port of your VPS (default: 22)"
+			userPort, _ := portTextInput.Show()
+			if userPort != "" {
+				port = userPort
+			}
+		}
+		pterm.Info.Printfln("Using SSH port: %s", port)
+
 		if certEmail == "" {
 			certEmailTextInput := pterm.DefaultInteractiveTextInput
 			certEmailTextInput.DefaultText = "Please enter an email for use with TLS certs"
@@ -83,6 +106,17 @@ var InitCmd = &cobra.Command{
 				os.Exit(0)
 			}
 		}
+
+		wasProviderProvided := cmd.Flags().Changed("ssh-provider")
+		if !wasProviderProvided {
+			sshProviderTextInput := pterm.DefaultInteractiveTextInput
+			sshProviderTextInput.DefaultText = "Please enter the SSH provider you want to use (default: openSSH, options: 1password, openssh)"
+			userProvider, _ := sshProviderTextInput.Show()
+			if userProvider != "" {
+				sshProvider = userProvider
+			}
+		}
+		pterm.Info.Printfln("Using SSH provider: %s", sshProvider)
 
 		// if keys exist -> a server is already setup
 		publicKey := viper.GetString("publicKey")
@@ -105,6 +139,8 @@ var InitCmd = &cobra.Command{
 
 		viper.Set("serverAddress", server)
 		viper.Set("certEmail", certEmail)
+		viper.Set("sshProvider", sshProvider)
+		viper.Set("sshPort", port)
 
 		pterm.Println()
 		pterm.DefaultHeader.WithFullWidth().Println("Sidekick booting up! 🚀")
@@ -116,7 +152,7 @@ var InitCmd = &cobra.Command{
 		users := []string{"root", "sidekick"}
 		canConnect := false
 		for _, user := range users {
-			sshClient, initSessionErr = utils.Login(server, user)
+			sshClient, initSessionErr = utils.Login(server, user, sshProvider, port)
 			if initSessionErr != nil {
 				continue
 			}
@@ -196,7 +232,7 @@ var InitCmd = &cobra.Command{
 		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
 
 		sidekickLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sidekickSshClient, err := utils.Login(server, "sidekick")
+		sidekickSshClient, err := utils.Login(server, "sidekick", sshProvider, port)
 		if err != nil {
 			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
 			log.Fatal(err)
@@ -313,5 +349,7 @@ func init() {
 
 	InitCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
 	InitCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
+	InitCmd.Flags().StringP("ssh-port", "p", "22", "SSH port for connecting to the server")
+	InitCmd.Flags().String("ssh-provider", "openssh", "SSH provider to use (openssh or 1password)")
 	InitCmd.Flags().BoolP("yes", "y", false, "Skip all validation prompts")
 }

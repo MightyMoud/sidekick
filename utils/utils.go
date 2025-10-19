@@ -213,3 +213,8 @@ func WriteEnvFile(filename string, env map[string]string) error {
 	}
 	return nil
 }
+
+func CommandExists(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
+}

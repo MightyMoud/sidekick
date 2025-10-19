@@ -83,7 +83,7 @@ It assumes that your VPS is already configured and that your application is read
 		)
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"), viper.GetString("sshPort"))
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Failed to connect to VPS: " + err.Error()})
 				return
@@ -125,7 +125,11 @@ It assumes that your VPS is already configured and that your application is read
 
 			cwd, _ := os.Getwd()
 			imgFileName := fmt.Sprintf("%s-latest.tar", appConfig.Name)
-			dockerBuildCmd := exec.Command("docker", "build", "--tag", appConfig.Name, "--progress=plain", "--platform=linux/amd64", cwd)
+			localContainerProvider := "docker"
+			if utils.CommandExists("podman") {
+				localContainerProvider = "podman"
+			}
+			dockerBuildCmd := exec.Command(localContainerProvider, "build", "--tag", appConfig.Name, "--progress=plain", "--platform=linux/amd64", cwd)
 			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
 			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 
@@ -138,7 +142,7 @@ It assumes that your VPS is already configured and that your application is read
 
 			p.Send(render.NextStageMsg{})
 
-			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appConfig.Name)
+			imgSaveCmd := exec.Command(localContainerProvider, "save", "-o", imgFileName, appConfig.Name)
 			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
 			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
 

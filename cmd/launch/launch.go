@@ -99,7 +99,7 @@ var LaunchCmd = &cobra.Command{
 		}
 
 		// make a docker service
-		imageName := appName
+		imageName := "localhost/" + appName
 		newService := utils.DockerService{
 			Image:   imageName,
 			Restart: "unless-stopped",
@@ -154,14 +154,18 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick", viper.GetString("sshProvider"), viper.GetString("sshPort"))
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
 			p.Send(render.NextStageMsg{})
 
 			cwd, _ := os.Getwd()
-			dockerBuildCmd := exec.Command("docker", "build", "--tag", appName, "--progress=plain", "--platform=linux/amd64", cwd)
+			localContainerProvider := "docker"
+			if utils.CommandExists("podman") {
+				localContainerProvider = "podman"
+			}
+			dockerBuildCmd := exec.Command(localContainerProvider, "build", "--tag", appName, "--progress=plain", "--platform=linux/amd64", cwd)
 			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
 			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 
@@ -174,7 +178,7 @@ var LaunchCmd = &cobra.Command{
 			p.Send(render.NextStageMsg{})
 
 			imgFileName := fmt.Sprintf("%s-latest.tar", appName)
-			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appName)
+			imgSaveCmd := exec.Command(localContainerProvider, "save", "-o", imgFileName, appName)
 			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
 			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
 
@@ -186,13 +190,13 @@ var LaunchCmd = &cobra.Command{
 
 			p.Send(render.NextStageMsg{})
 
-			_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
+			_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir -p %s", appName))
 			if sessionErr != nil {
 				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
 			}
 
 			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appName)
-			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
+			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist, "-P", viper.GetString("sshPort"))
 			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
 			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
 
