@@ -33,6 +33,10 @@ var SetupStage = CommandsStage{
 	SpinnerSuccessMessage: "VPS updated and setup successfully",
 	SpinnerFailMessage:    "Error happened running basic setup commands",
 	Commands: []string{
+		`bash -c 'while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+        sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
+        sudo fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do \
+        echo "Waiting for apt lock..."; sleep 5; done'`,
 		"sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config && sudo systemctl restart ssh",
 		"sudo apt-get update -y",
 		"sudo apt-get upgrade -y",

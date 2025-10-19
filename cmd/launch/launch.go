@@ -31,6 +31,44 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func prelude() string {
+	if configErr := utils.ViperInit(); configErr != nil {
+		render.GetLogger(log.Options{Prefix: "Sidekick Config"}).Fatalf("%s", configErr)
+	}
+
+	if viper.GetString("secretKey") == "" {
+		render.GetLogger(log.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
+		render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
+		render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
+		os.Exit(1)
+	}
+
+	if utils.FileExists("./sidekick.yml") {
+		render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Error("Sidekick config exits in this project.")
+		render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Info("You can deploy a new version of your application with Sidekick deploy.")
+		os.Exit(1)
+	}
+
+	if utils.FileExists("./Dockerfile") {
+		render.GetLogger(log.Options{Prefix: "Dockerfile"}).Info("Detected - scanning file for details")
+	} else {
+		render.GetLogger(log.Options{Prefix: "Dockerfile"}).Fatal("No dockerfile found in current directory.")
+	}
+
+	res, err := os.ReadFile("./Dockerfile")
+	if err != nil {
+		render.GetLogger(log.Options{Prefix: "Dockerfile"}).Fatal("Unable to process your dockerfile")
+	}
+
+	appPort := ""
+	for _, line := range strings.Split(string(res), "\n") {
+		if strings.HasPrefix(line, "EXPOSE ") {
+			appPort = strings.TrimPrefix(line, "EXPOSE ")
+		}
+	}
+	return appPort
+}
+
 var LaunchCmd = &cobra.Command{
 	Use:   "launch",
 	Short: "Launch a new application to host on your VPS with Sidekick",
@@ -38,40 +76,7 @@ var LaunchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		start := time.Now()
 
-		if configErr := utils.ViperInit(); configErr != nil {
-			render.GetLogger(log.Options{Prefix: "Sidekick Config"}).Fatalf("%s", configErr)
-		}
-
-		if viper.GetString("secretKey") == "" {
-			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Error("Recent changes to how Sidekick handles secrets prevents you from launcing a new application.")
-			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("To fix this, run `Sidekick init` with the same server address you have now.")
-			render.GetLogger(log.Options{Prefix: "Backward Compat"}).Info("Learn more at www.sidekickdeploy.com/docs/design/encryption")
-			os.Exit(1)
-		}
-
-		if utils.FileExists("./sidekick.yml") {
-			render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Error("Sidekick config exits in this project.")
-			render.GetLogger(log.Options{Prefix: "Sidekick Setup"}).Info("You can deploy a new version of your application with Sidekick deploy.")
-			os.Exit(1)
-		}
-
-		if utils.FileExists("./Dockerfile") {
-			render.GetLogger(log.Options{Prefix: "Dockerfile"}).Info("Detected - scanning file for details")
-		} else {
-			render.GetLogger(log.Options{Prefix: "Dockerfile"}).Fatal("No dockerfile found in current directory.")
-		}
-
-		res, err := os.ReadFile("./Dockerfile")
-		if err != nil {
-			render.GetLogger(log.Options{Prefix: "Dockerfile"}).Fatal("Unable to process your dockerfile")
-		}
-
-		appPort := ""
-		for _, line := range strings.Split(string(res), "\n") {
-			if strings.HasPrefix(line, "EXPOSE ") {
-				appPort = strings.TrimPrefix(line, "EXPOSE ")
-			}
-		}
+		appPort := prelude()
 
 		appName := render.GenerateTextQuestion("Please enter your app url friendly app name", "", "will identify your app containers")
 		appPort = render.GenerateTextQuestion("Please enter the port at which the app receives request", appPort, "")
@@ -270,6 +275,5 @@ var LaunchCmd = &cobra.Command{
 			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}
-
 	},
 }

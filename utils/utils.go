@@ -111,7 +111,6 @@ func IsValidIPAddress(ip string) bool {
 	re := regexp.MustCompile(ipPattern)
 
 	return re.MatchString(ip)
-
 }
 
 func FileExists(filename string) bool {
@@ -177,9 +176,18 @@ func HandleEnvFile(envFileName string, dockerEnvProperty *[]string, envFileCheck
 	// calculate and store the hash of env file to re-encrypt later on when changed
 	envFileContent, _ := godotenv.Marshal(envMap)
 	*envFileChecksum = fmt.Sprintf("%x", md5.Sum([]byte(envFileContent)))
-	envCmd := exec.Command("sh", "-s", "-", viper.GetString("publicKey"), fmt.Sprintf("./%s", envFileName))
-	// encrypt and save/override encrypted.env
-	envCmd.Stdin = strings.NewReader(EnvEncryptionScript)
+	envCmd := exec.Command("sops",
+		"encrypt",
+		"--output-type", "dotenv",
+		"--age", viper.GetString("publicKey"),
+		fmt.Sprintf("./%s", envFileName),
+	)
+	outfile, err := os.Create("encrypted.env")
+	if err != nil {
+		return err
+	}
+	defer outfile.Close()
+	envCmd.Stdout = outfile
 	if envCmdErr := envCmd.Run(); envCmdErr != nil {
 		return envCmdErr
 	}
