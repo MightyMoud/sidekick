@@ -83,7 +83,7 @@ It assumes that your VPS is already configured and that your application is read
 		)
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), viper.GetString("sshPort"), "sidekick")
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Failed to connect to VPS: " + err.Error()})
 				return

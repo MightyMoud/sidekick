@@ -154,7 +154,7 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+			sshClient, err := utils.Login(viper.GetString("serverAddress"), viper.GetString("sshPort"), "sidekick")
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}

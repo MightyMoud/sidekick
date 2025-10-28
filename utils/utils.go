@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -111,6 +112,22 @@ func IsValidIPAddress(ip string) bool {
 	re := regexp.MustCompile(ipPattern)
 
 	return re.MatchString(ip)
+}
+
+func IsValidPort(port string) bool {
+	const portPattern = `^\d{1,5}$`
+
+	re := regexp.MustCompile(portPattern)
+	if !re.MatchString(port) {
+		return false
+	}
+
+	portNumber, err := strconv.Atoi(port)
+	if err != nil || portNumber < 1 || portNumber > 65535 {
+		return false
+	}
+
+	return true
 }
 
 func FileExists(filename string) bool {

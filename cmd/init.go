@@ -59,6 +59,11 @@ var InitCmd = &cobra.Command{
 		if serverFlagErr != nil {
 			fmt.Println(serverFlagErr)
 		}
+
+		port, portFlagErr := cmd.Flags().GetString("port")
+		if portFlagErr != nil {
+			fmt.Println(portFlagErr)
+		}
 		certEmail, emailFlagError := cmd.Flags().GetString("email")
 		if emailFlagError != nil {
 			fmt.Println(emailFlagError)
@@ -70,6 +75,16 @@ var InitCmd = &cobra.Command{
 			server, _ = serverTextInput.Show()
 			if !utils.IsValidIPAddress(server) {
 				pterm.Error.Printfln("You entered an incorrect IP Address - %s", server)
+				os.Exit(0)
+			}
+		}
+
+		if port == "" {
+			portTextInput := pterm.DefaultInteractiveTextInput
+			portTextInput.DefaultText = "Please enter the SSH Port of your VPS"
+			port, _ = portTextInput.Show()
+			if !utils.IsValidPort(port) {
+				pterm.Error.Printfln("You entered an incorrect SSH Port - %s", port)
 				os.Exit(0)
 			}
 		}
@@ -104,6 +119,7 @@ var InitCmd = &cobra.Command{
 		}
 
 		viper.Set("serverAddress", server)
+		viper.Set("sshPort", port)
 		viper.Set("certEmail", certEmail)
 
 		pterm.Println()
@@ -116,7 +132,7 @@ var InitCmd = &cobra.Command{
 		users := []string{"root", "sidekick"}
 		canConnect := false
 		for _, user := range users {
-			sshClient, initSessionErr = utils.Login(server, user)
+			sshClient, initSessionErr = utils.Login(server, port, user)
 			if initSessionErr != nil {
 				continue
 			}
@@ -196,7 +212,7 @@ var InitCmd = &cobra.Command{
 		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
 
 		sidekickLoginSpinner.Sequence = []string{"▀ ", " ▀", " ▄", "▄ "}
-		sidekickSshClient, err := utils.Login(server, "sidekick")
+		sidekickSshClient, err := utils.Login(server, port, "sidekick")
 		if err != nil {
 			sidekickLoginSpinner.Fail("Something went wrong logging in to your VPS")
 			log.Fatal(err)
@@ -312,6 +328,7 @@ func init() {
 	rootCmd.AddCommand(InitCmd)
 
 	InitCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
+	InitCmd.Flags().StringP("port", "p", "", "Set the SSH Port of your server")
 	InitCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
 	InitCmd.Flags().BoolP("yes", "y", false, "Skip all validation prompts")
 }
