@@ -15,7 +15,9 @@ limitations under the License.
 package launch
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -24,12 +26,32 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
+	"github.com/docker/docker/api/types/build"
+	"github.com/docker/docker/client"
 	"github.com/mightymoud/sidekick/render"
 	"github.com/mightymoud/sidekick/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 )
+
+var dockerClient *client.Client
+
+func getDockerClient() (*client.Client, error) {
+	if dockerClient != nil {
+		return dockerClient, nil
+	}
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+
+	dockerClient = cli
+
+	return cli, nil
+}
 
 func prelude() string {
 	if configErr := utils.ViperInit(); configErr != nil {
@@ -67,6 +89,142 @@ func prelude() string {
 		}
 	}
 	return appPort
+}
+
+func stage_1() (*ssh.Client, error) {
+	sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+	return sshClient, err
+}
+
+func stage_2(appName string, p *tea.Program) error {
+	cwd, _ := os.Getwd()
+	cwdTar, err := utils.TarDirectoryToReader(cwd)
+	if err != nil {
+		return err
+	}
+
+	dockerClient, err := getDockerClient()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	resp, err := dockerClient.ImageBuild(ctx, cwdTar, build.ImageBuildOptions{
+		Tags:     []string{fmt.Sprintf("%s:latest", appName)},
+		Platform: "linux/amd64",
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	render.SendDockerBuildLogsToTUI(resp.Body, p)
+	time.Sleep(time.Millisecond * 100)
+	return nil
+}
+
+func stage_3(appName string, p *tea.Program) error {
+	ctx := context.Background()
+	imageReader, err := dockerClient.ImageSave(ctx, []string{fmt.Sprintf("%s:latest", appName)})
+	if err != nil {
+		return err
+	}
+	defer imageReader.Close()
+
+	imgFileName := fmt.Sprintf("%s-latest.tar", appName)
+	outFile, err := os.Create(imgFileName)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	if _, err := io.Copy(outFile, imageReader); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func stage_4(sshClient *ssh.Client, appName string, p *tea.Program) error {
+	_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
+	if sessionErr != nil {
+		p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
+	}
+	imgFileName := fmt.Sprintf("%s-latest.tar", appName)
+	remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appName)
+	imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
+	imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
+	go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
+
+	if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
+		return imgMovCmdErr
+	}
+	defer os.Remove(imgFileName)
+	dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s && rm %s", appName, imgFileName, imgFileName))
+	go func() {
+		p.Send(render.LogMsg{LogLine: <-dockerLoadOutChan + "\n"})
+		time.Sleep(time.Millisecond * 50)
+	}()
+	if sessionErr != nil {
+		time.Sleep(time.Millisecond * 100)
+		p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
+	}
+	return nil
+}
+
+func stage_5(sshClient *ssh.Client, appName string, appPort string, appDomain string, hasEnvFile bool, envFileName string, envFileChecksum string, p *tea.Program) error {
+	rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
+	rsyncCmErr := rsyncCmd.Run()
+	if rsyncCmErr != nil {
+		return rsyncCmErr
+	}
+
+	if hasEnvFile {
+		encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
+		encryptSyncErr := encryptSync.Run()
+		if encryptSyncErr != nil {
+			return encryptSyncErr
+		}
+
+		runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName, viper.GetString("secretKey")))
+		go func() {
+			p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
+			time.Sleep(time.Millisecond * 50)
+		}()
+		if sessionErr1 != nil {
+			return sessionErr1
+		}
+	} else {
+		runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
+		go func() {
+			p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
+			time.Sleep(time.Millisecond * 50)
+		}()
+		if sessionErr1 != nil {
+			return sessionErr1
+		}
+	}
+
+	portNumber, err := strconv.ParseUint(appPort, 0, 64)
+	if err != nil {
+		return err
+	}
+	envConfig := utils.SidekickAppEnvConfig{}
+	if hasEnvFile {
+		envConfig.File = envFileName
+		envConfig.Hash = envFileChecksum
+	}
+	// save app config in same folder
+	sidekickAppConfig := utils.SidekickAppConfig{
+		Name:      appName,
+		Version:   "V1",
+		Port:      portNumber,
+		Url:       appDomain,
+		CreatedAt: time.Now().Format(time.UnixDate),
+		Env:       envConfig,
+	}
+	ymlData, _ := yaml.Marshal(&sidekickAppConfig)
+	os.WriteFile("./sidekick.yml", ymlData, 0644)
+	return nil
 }
 
 var LaunchCmd = &cobra.Command{
@@ -154,120 +312,39 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
+			sshClient, err := stage_1()
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
-			p.Send(render.NextStageMsg{})
-
-			cwd, _ := os.Getwd()
-			dockerBuildCmd := exec.Command("docker", "build", "--tag", appName, "--progress=plain", "--platform=linux/amd64", cwd)
-			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
-			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
-
-			if dockerBuildErr := dockerBuildCmd.Run(); dockerBuildErr != nil {
-				p.Send(render.ErrorMsg{})
-			}
 
 			time.Sleep(time.Millisecond * 100)
-
 			p.Send(render.NextStageMsg{})
 
-			imgFileName := fmt.Sprintf("%s-latest.tar", appName)
-			imgSaveCmd := exec.Command("docker", "save", "-o", imgFileName, appName)
-			imgSaveCmdErrPipe, _ := imgSaveCmd.StderrPipe()
-			go render.SendLogsToTUI(imgSaveCmdErrPipe, p)
-
-			if imgSaveCmdErr := imgSaveCmd.Run(); imgSaveCmdErr != nil {
-				p.Send(render.ErrorMsg{})
-			}
-
-			time.Sleep(time.Millisecond * 100)
-
-			p.Send(render.NextStageMsg{})
-
-			_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
-			if sessionErr != nil {
-				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
-			}
-
-			remoteDist := fmt.Sprintf("%s@%s:./%s", "sidekick", viper.GetString("serverAddress"), appName)
-			imgMoveCmd := exec.Command("scp", "-C", imgFileName, remoteDist)
-			imgMoveCmdErrorPipe, _ := imgMoveCmd.StderrPipe()
-			go render.SendLogsToTUI(imgMoveCmdErrorPipe, p)
-
-			if imgMovCmdErr := imgMoveCmd.Run(); imgMovCmdErr != nil {
-				p.Send(render.ErrorMsg{})
-			}
-			defer os.Remove(imgFileName)
-
-			time.Sleep(time.Millisecond * 200)
-
-			dockerLoadOutChan, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("cd %s && docker load -i %s && rm %s", appName, imgFileName, imgFileName))
-			go func() {
-				p.Send(render.LogMsg{LogLine: <-dockerLoadOutChan + "\n"})
-				time.Sleep(time.Millisecond * 50)
-			}()
-			if sessionErr != nil {
-				time.Sleep(time.Millisecond * 100)
-				p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
+			if err = stage_2(appName, p); err != nil {
+				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong building your docker image: %s", err)})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
-			rsyncCmErr := rsyncCmd.Run()
-			if rsyncCmErr != nil {
-				p.Send(render.ErrorMsg{ErrorStr: rsyncCmErr.Error()})
+			if err = stage_3(appName, p); err != nil {
+				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong saving docker image to a file: %s", err)})
 			}
 
-			if hasEnvFile {
-				encryptSync := exec.Command("rsync", "encrypted.env", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
-				encryptSyncErr := encryptSync.Run()
-				if encryptSyncErr != nil {
-					p.Send(render.ErrorMsg{ErrorStr: encryptSyncErr.Error()})
-				}
+			time.Sleep(time.Millisecond * 100)
+			p.Send(render.NextStageMsg{})
 
-				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && export SOPS_AGE_KEY=%s && sops exec-env encrypted.env 'docker compose -p sidekick up -d'`, appName, viper.GetString("secretKey")))
-				go func() {
-					p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
-					time.Sleep(time.Millisecond * 50)
-				}()
-				if sessionErr1 != nil {
-					p.Send(render.ErrorMsg{ErrorStr: sessionErr1.Error()})
-				}
-			} else {
-				runAppCmdOutChan, _, sessionErr1 := utils.RunCommand(sshClient, fmt.Sprintf(`cd %s && docker compose -p sidekick up -d`, appName))
-				go func() {
-					p.Send(render.LogMsg{LogLine: <-runAppCmdOutChan + "\n"})
-					time.Sleep(time.Millisecond * 50)
-				}()
-				if sessionErr1 != nil {
-					p.Send(render.ErrorMsg{ErrorStr: sessionErr1.Error()})
-				}
+			if err = stage_4(sshClient, appName, p); err != nil {
+				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong moving the image to your VPS: %s", err)})
 			}
 
-			portNumber, err := strconv.ParseUint(appPort, 0, 64)
-			if err != nil {
-				panic(err)
+			time.Sleep(time.Millisecond * 100)
+			p.Send(render.NextStageMsg{})
+
+			if err = stage_5(sshClient, appName, appPort, appDomain, hasEnvFile, envFileName, envFileChecksum, p); err != nil {
+				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong booting up your app: %s", err)})
 			}
-			envConfig := utils.SidekickAppEnvConfig{}
-			if hasEnvFile {
-				envConfig.File = envFileName
-				envConfig.Hash = envFileChecksum
-			}
-			// save app config in same folder
-			sidekickAppConfig := utils.SidekickAppConfig{
-				Name:      appName,
-				Version:   "V1",
-				Port:      portNumber,
-				Url:       appDomain,
-				CreatedAt: time.Now().Format(time.UnixDate),
-				Env:       envConfig,
-			}
-			ymlData, _ := yaml.Marshal(&sidekickAppConfig)
-			os.WriteFile("./sidekick.yml", ymlData, 0644)
+
 			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: appDomain})
 		}()
 

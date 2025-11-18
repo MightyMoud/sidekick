@@ -56,3 +56,12 @@ type TuiModel struct {
 	URL            string
 	BannerMsg      string
 }
+
+type buildMsg struct {
+	Stream      string `json:"stream"`
+	Status      string `json:"status"`
+	ID          string `json:"id"`
+	Progress    string `json:"progress"`
+	ProgressMsg string `json:"progressDetail"`
+	Error       string `json:"error"`
+}

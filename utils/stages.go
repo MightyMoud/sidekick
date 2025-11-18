@@ -14,7 +14,10 @@ limitations under the License.
 */
 package utils
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 var UsersetupStage = CommandsStage{
 	SpinnerSuccessMessage: "New user created successfully",
@@ -71,11 +74,13 @@ func GetTraefikStage(email string) CommandsStage {
 		SpinnerSuccessMessage: "Successfully setup Traefik",
 		SpinnerFailMessage:    "Something went wrong setting up Traefik on your VPS",
 		Commands: []string{
-			"sudo apt-get install git -y",
-			"git clone https://github.com/mightymoud/sidekick-traefik.git",
-			fmt.Sprintf(`cd sidekick-traefik/traefik && sed -i.bak 's/\$EMAIL/%s/g' traefik.yml && rm traefik.yml.bak`, email),
+			"mkdir traefik",
+			fmt.Sprintf("echo '%s' > ./traefik/docker-compose.yml", strings.Replace(TraefikDockerComposeFile, "$EMAIL", email, 1)),
+			"mkdir -p ./traefik/ssl-certs/",
+			"touch ./traefik/ssl-certs/acme.json",
+			"chmod 600 ./traefik/ssl-certs/acme.json",
 			"sudo docker network create sidekick",
-			"cd sidekick-traefik && sudo docker compose -p sidekick up -d",
+			"cd traefik && sudo docker compose -p sidekick up -d",
 		},
 	}
 }

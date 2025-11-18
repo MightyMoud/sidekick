@@ -16,6 +16,7 @@ package render
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -171,6 +172,7 @@ func getLogContainerStyle(m TuiModel) lipgloss.Style {
 		BorderForeground(lipgloss.Color("69")).
 		Foreground(lipgloss.Color("white")).Faint(true)
 }
+
 func getBannerStyle(m TuiModel) lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("white")).
@@ -195,6 +197,39 @@ func MakeStage(title string, success string, hasLogs bool) Stage {
 		Success: success,
 		Logs:    logs,
 		HasLogs: hasLogs,
+	}
+}
+
+func SendDockerBuildLogsToTUI(resBody io.ReadCloser, p *tea.Program) {
+	dec := json.NewDecoder(resBody)
+	for {
+		var msg buildMsg
+		if err := dec.Decode(&msg); err == io.EOF {
+			break
+		}
+		// skip errors here cus shape is wront anyway -> to fix this later
+		// else if err != nil {
+		// fmt.Println(err)
+		// }
+
+		switch {
+		case msg.Stream != "":
+			p.Send(LogMsg{LogLine: msg.Stream})
+		case msg.Status != "":
+			if msg.ID != "" {
+				// Yes yes, I'll have a closer look at this later
+				// if msg.Progress != "" {
+				// p.Send(render.LogMsg{LogLine: fmt.Sprintf("[%s] %s %s\n", msg.ID, msg.Status, msg.Progress)})
+				// } else {
+				// p.Send(LogMsg{LogLine: fmt.Sprintf("[%s] %s\n", msg.ID, msg.Status)})
+				// }
+			} else {
+				p.Send(LogMsg{LogLine: msg.Status})
+			}
+		case msg.Error != "":
+			p.Send(ErrorMsg{ErrorStr: msg.Error})
+			time.Sleep(time.Millisecond * 50)
+		}
 	}
 }
 

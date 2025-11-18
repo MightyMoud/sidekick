@@ -70,3 +70,35 @@ var CheckGitTreeScript = `
 	  exit
 	fi
 	`
+
+var TraefikDockerComposeFile = `
+services:
+  traefik-service:
+    image: traefik:v3.6.1
+    command:
+      - --api.insecure=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=default
+      - --providers.docker.exposedbydefault=false
+      - --certificatesresolvers.default.acme.email=$EMAIL
+      - --certificatesresolvers.default.acme.storage=/ssl-certs/acme.json
+      - --certificatesresolvers.default.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+      # The Web UI (enabled by --api.insecure=true)
+      # - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/ssl/:/ssl-certs/
+    networks:
+      - sidekick
+
+networks:
+  sidekick:
+    external: true
+`
