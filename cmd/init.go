@@ -156,7 +156,6 @@ var InitCmd = &cobra.Command{
 		}
 		_, ageErr := exec.LookPath("age")
 		if ageErr != nil {
-			// log.Println("Age not found, installing Age")
 			_, err := exec.LookPath("brew")
 			if err != nil {
 				log.Fatalf("Failed to run brew. Brew is required to use Sidekick: %s", err)
@@ -191,7 +190,6 @@ var InitCmd = &cobra.Command{
 				stage0Spinner.Fail(utils.UsersetupStage.SpinnerFailMessage)
 				panic(err)
 			}
-
 		}
 		stage0Spinner.Success(utils.UsersetupStage.SpinnerSuccessMessage)
 

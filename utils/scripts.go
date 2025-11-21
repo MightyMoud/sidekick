@@ -71,6 +71,38 @@ var CheckGitTreeScript = `
 	fi
 	`
 
+var SetupStageScript = `
+#!/usr/bin/env bash
+set -e
+
+wait_for_locks() {
+    echo "Waiting for apt/dpkg locks..."
+    while fuser /var/lib/dpkg/lock >/dev/null 2>&1 \
+       || fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+       || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+        sleep 1
+    done
+}
+
+echo "Updating SSH config..."
+sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config && sudo systemctl restart ssh
+sudo systemctl restart ssh
+
+wait_for_locks
+sudo apt-get update -y
+
+wait_for_locks
+sudo apt-get upgrade -y
+
+wait_for_locks
+sudo apt-get install -y age ca-certificates curl vim
+
+echo "Installing sops..."
+curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+sudo mv sops-v3.9.0.linux.amd64 /usr/local/bin/sops
+sudo chmod +x /usr/local/bin/sops
+`
+
 var TraefikDockerComposeFile = `
 services:
   traefik-service:

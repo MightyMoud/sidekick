@@ -36,18 +36,9 @@ var SetupStage = CommandsStage{
 	SpinnerSuccessMessage: "VPS updated and setup successfully",
 	SpinnerFailMessage:    "Error happened running basic setup commands",
 	Commands: []string{
-		`bash -c 'while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
-        sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || \
-        sudo fuser /var/cache/apt/archives/lock >/dev/null 2>&1; do \
-        echo "Waiting for apt lock..."; sleep 5; done'`,
-		"sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config && sudo systemctl restart ssh",
-		"sudo apt-get update -y",
-		"sudo apt-get upgrade -y",
-		"sudo apt-get install age -y",
-		"sudo apt-get install ca-certificates curl vim -y",
-		"curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64",
-		"sudo mv sops-v3.9.0.linux.amd64 /usr/local/bin/sops",
-		"sudo chmod +x /usr/local/bin/sops",
+		fmt.Sprintf("echo '%s' > ./setup.sh", SetupStageScript),
+		"chmod +x ./setup.sh",
+		"sudo ./setup.sh",
 	},
 }
 
