@@ -345,7 +345,7 @@ var LaunchCmd = &cobra.Command{
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong booting up your app: %s", err)})
 			}
 
-			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: appDomain})
+			p.Send(render.AllDoneMsg{Message: "🚀 Deployed successfully in " + time.Since(start).Round(time.Second).String() + ".\n" + "😎 View your app at https://" + appDomain})
 		}()
 
 		if _, err := p.Run(); err != nil {

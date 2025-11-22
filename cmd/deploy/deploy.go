@@ -221,7 +221,7 @@ It assumes that your VPS is already configured and that your application is read
 			os.WriteFile("./sidekick.yml", ymlData, 0644)
 
 			time.Sleep(time.Millisecond * 500)
-			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: appConfig.Url})
+			p.Send(render.AllDoneMsg{Message: "🚀 Deployed successfully in " + time.Since(start).Round(time.Second).String() + ".\n" + "😎 View your app at https://" + appConfig.Url})
 		}()
 
 		if _, err := p.Run(); err != nil {

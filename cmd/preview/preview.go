@@ -248,7 +248,8 @@ var PreviewCmd = &cobra.Command{
 			os.Remove("encrypted.env")
 			os.Remove(imgFileName)
 
-			p.Send(render.AllDoneMsg{Duration: time.Since(start).Round(time.Second), URL: previewURL})
+			p.Send(render.AllDoneMsg{Message: "🚀 Deployed successfully in " + time.Since(start).Round(time.Second).String() + ".\n" + "😎 View your app at https://" + previewURL})
+
 		}()
 
 		if _, err := p.Run(); err != nil {

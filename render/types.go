@@ -15,8 +15,6 @@ limitations under the License.
 package render
 
 import (
-	"time"
-
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -26,8 +24,7 @@ type LogMsg struct {
 }
 
 type AllDoneMsg struct {
-	Duration time.Duration
-	URL      string
+	Message string
 }
 
 type ErrorMsg struct {
@@ -52,9 +49,8 @@ type TuiModel struct {
 	ViewportWidth  int
 	ViewportHeight int
 	AllDone        bool
-	Duration       time.Duration
-	URL            string
 	BannerMsg      string
+	FinalMessage   string
 }
 
 type buildMsg struct {

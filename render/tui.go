@@ -82,8 +82,7 @@ func (m TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case AllDoneMsg:
 		m.AllDone = true
-		m.URL = msg.URL
-		m.Duration = msg.Duration
+		m.FinalMessage = msg.Message
 
 		return m, tea.Quit
 
@@ -148,7 +147,7 @@ func (m TuiModel) View() string {
 	}
 
 	if m.AllDone {
-		printSlice = append(printSlice, allDoneStyle.Render("🚀 Deployed successfully in "+m.Duration.String()+".\n"+"😎 View your app at https://"+m.URL))
+		printSlice = append(printSlice, allDoneStyle.Render(m.FinalMessage))
 	}
 
 	s += lipgloss.JoinVertical(lipgloss.Top, printSlice...)
