@@ -91,12 +91,12 @@ func prelude() string {
 	return appPort
 }
 
-func stage_1() (*ssh.Client, error) {
+func stage1() (*ssh.Client, error) {
 	sshClient, err := utils.Login(viper.GetString("serverAddress"), "sidekick")
 	return sshClient, err
 }
 
-func stage_2(appName string, p *tea.Program) error {
+func stage2(appName string, p *tea.Program) error {
 	cwd, _ := os.Getwd()
 	cwdTar, err := utils.TarDirectoryToReader(cwd)
 	if err != nil {
@@ -122,7 +122,7 @@ func stage_2(appName string, p *tea.Program) error {
 	return nil
 }
 
-func stage_3(appName string, p *tea.Program) error {
+func stage3(appName string, p *tea.Program) error {
 	ctx := context.Background()
 	imageReader, err := dockerClient.ImageSave(ctx, []string{fmt.Sprintf("%s:latest", appName)})
 	if err != nil {
@@ -144,7 +144,7 @@ func stage_3(appName string, p *tea.Program) error {
 	return nil
 }
 
-func stage_4(sshClient *ssh.Client, appName string, p *tea.Program) error {
+func stage4(sshClient *ssh.Client, appName string, p *tea.Program) error {
 	_, _, sessionErr := utils.RunCommand(sshClient, fmt.Sprintf("mkdir %s", appName))
 	if sessionErr != nil {
 		p.Send(render.ErrorMsg{ErrorStr: sessionErr.Error()})
@@ -171,7 +171,7 @@ func stage_4(sshClient *ssh.Client, appName string, p *tea.Program) error {
 	return nil
 }
 
-func stage_5(sshClient *ssh.Client, appName string, appPort string, appDomain string, hasEnvFile bool, envFileName string, envFileChecksum string, p *tea.Program) error {
+func stage5(sshClient *ssh.Client, appName string, appPort string, appDomain string, hasEnvFile bool, envFileName string, envFileChecksum string, p *tea.Program) error {
 	rsyncCmd := exec.Command("rsync", "docker-compose.yaml", fmt.Sprintf("%s@%s:%s", "sidekick", viper.GetString("serverAddress"), fmt.Sprintf("./%s", appName)))
 	rsyncCmErr := rsyncCmd.Run()
 	if rsyncCmErr != nil {
@@ -312,7 +312,7 @@ var LaunchCmd = &cobra.Command{
 		})
 
 		go func() {
-			sshClient, err := stage_1()
+			sshClient, err := stage1()
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: "Something went wrong logging in to your VPS"})
 			}
@@ -320,28 +320,28 @@ var LaunchCmd = &cobra.Command{
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			if err = stage_2(appName, p); err != nil {
+			if err = stage2(appName, p); err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong building your docker image: %s", err)})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			if err = stage_3(appName, p); err != nil {
+			if err = stage3(appName, p); err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong saving docker image to a file: %s", err)})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			if err = stage_4(sshClient, appName, p); err != nil {
+			if err = stage4(sshClient, appName, p); err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong moving the image to your VPS: %s", err)})
 			}
 
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			if err = stage_5(sshClient, appName, appPort, appDomain, hasEnvFile, envFileName, envFileChecksum, p); err != nil {
+			if err = stage5(sshClient, appName, appPort, appDomain, hasEnvFile, envFileName, envFileChecksum, p); err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Something went wrong booting up your app: %s", err)})
 			}
 
