@@ -61,6 +61,103 @@ var DeployAppScript = `
 	docker compose -p sidekick up -d --scale $service_name=1 --no-recreate $service_name
 	`
 
+var DeployApp = `
+#!/usr/bin/env bash
+set -euo pipefail
+
+# minimal configuration (edit as needed)
+SERVICE="$service_name"
+APP_PORT="$app_port"
+SLEEP_AFTER_START=3
+COMPOSE_PROJECT="sidekick"
+
+# helper for nicer logs
+log() { echo "[$(date +'%T')] $*"; }
+
+# move into service dir (assumes compose file lives in ./<service>/)
+if [[ ! -d "$SERVICE" ]]; then
+  log "ERROR: service directory '$SERVICE' not found."
+  exit 2
+fi
+
+cd "$SERVICE"
+
+log "Starting rolling replace for service='$SERVICE', port=$APP_PORT"
+
+# find the old container (oldest for this service)
+old_container_id=$(docker ps -f "name=${SERVICE}" -q | tail -n1 || true)
+if [[ -z "$old_container_id" ]]; then
+  log "ERROR: no running containers found for service '${SERVICE}'."
+  exit 3
+fi
+log "Old container (to be replaced): $old_container_id"
+
+# create a new instance by scaling up to 2 (no deps, don't recreate existing)
+log "Scaling up to 2 (creating a new container)..."
+docker compose -p "$COMPOSE_PROJECT" up -d --no-deps --scale "$SERVICE"=2 --no-recreate "$SERVICE"
+
+# optional small wait for the container to begin initializing
+if (( SLEEP_AFTER_START > 0 )); then
+  log "Sleeping $SLEEP_AFTER_START seconds for startup..."
+  sleep "$SLEEP_AFTER_START"
+fi
+
+# find newest container for this service
+new_container_id=$(docker ps -f "name=${SERVICE}" -q | head -n1 || true)
+if [[ -z "$new_container_id" ]]; then
+  log "ERROR: failed to detect new container after scaling."
+  exit 4
+fi
+
+# safety: ensure new != old
+if [[ "$new_container_id" == "$old_container_id" ]]; then
+  log "ERROR: detected the same container as new and old ($new_container_id). Aborting."
+  exit 5
+fi
+
+log "New container: $new_container_id"
+
+# get internal IP of the new container
+new_container_ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$new_container_id" || true)
+if [[ -z "$new_container_ip" ]]; then
+  log "ERROR: could not determine IP of new container $new_container_id"
+  # clean up the new container to avoid leaving an extra one
+  docker rm -f "$new_container_id" || true
+  # restore scale to 1 (best effort)
+  docker compose -p "$COMPOSE_PROJECT" up -d --scale "$SERVICE"=1 --no-recreate "$SERVICE" || true
+  exit 6
+fi
+
+log "New container IP: $new_container_ip"
+
+# health check (preserve your curl options)
+HEALTH_URL="http://$new_container_ip:$APP_PORT/"
+log "Health checking $HEALTH_URL (this may retry internally via curl)..."
+
+if ! curl --silent --include --retry-connrefused --retry 30 --retry-delay 1 --fail "$HEALTH_URL" >/dev/null 2>&1; then
+  log "ERROR: health check failed against $HEALTH_URL"
+  log "Removing failed new container $new_container_id and restoring state..."
+  docker rm -f "$new_container_id" || true
+  docker compose -p "$COMPOSE_PROJECT" up -d --scale "$SERVICE"=1 --no-recreate "$SERVICE" || true
+  exit 7
+fi
+
+log "Health check passed. Swapping containers..."
+
+# stop & remove the old container (now safe)
+docker stop "$old_container_id"
+docker rm "$old_container_id"
+
+# scale back to 1 (remove the spare)
+docker compose -p "$COMPOSE_PROJECT" up -d --scale "$SERVICE"=1 --no-recreate "$SERVICE"
+
+log "Done — replaced $old_container_id with $new_container_id and scaled to 1."
+
+exit 0
+
+
+	`
+
 var CheckGitTreeScript = `
 	if [[ -z $(git status -s) ]]
 	then
