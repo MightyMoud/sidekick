@@ -125,7 +125,8 @@ It assumes that your VPS is already configured and that your application is read
 
 			cwd, _ := os.Getwd()
 			imgFileName := fmt.Sprintf("%s-latest.tar", appConfig.Name)
-			dockerBuildCmd := exec.Command("docker", "build", "--tag", appConfig.Name, "--progress=plain", "--platform=linux/amd64", cwd)
+			dockerPlatformId := viper.GetString("platformID")
+			dockerBuildCmd := exec.Command("docker", "build", "--tag", appConfig.Name, "--progress=plain", fmt.Sprintf("--platform=%s", dockerPlatformId), cwd)
 			dockerBuildCmdErrPipe, _ := dockerBuildCmd.StderrPipe()
 			go render.SendLogsToTUI(dockerBuildCmdErrPipe, p)
 

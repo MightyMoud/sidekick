@@ -111,7 +111,7 @@ func stage2(appName string, p *tea.Program) error {
 	ctx := context.Background()
 	resp, err := dockerClient.ImageBuild(ctx, cwdTar, build.ImageBuildOptions{
 		Tags:     []string{fmt.Sprintf("%s:latest", appName)},
-		Platform: "linux/amd64",
+		Platform: viper.GetString("platformID"),
 	})
 	if err != nil {
 		return err

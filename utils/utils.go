@@ -25,8 +25,10 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
 	"github.com/joho/godotenv"
+	"github.com/mightymoud/sidekick/render"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -87,6 +89,45 @@ func RunCommand(client *ssh.Client, cmd string) (chan string, chan string, error
 	return stdOutChannel, errChannel, nil
 }
 
+func RunCommandWithTUIHook(client *ssh.Client, cmd string, p *tea.Program) {
+	session, err := client.NewSession()
+	if err != nil {
+		log.Fatalf("Failed to create session: %s", err)
+	}
+	defer session.Close()
+
+	stdoutReader, err := session.StdoutPipe()
+	if err != nil {
+		p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("error running command - %s: - %s", cmd, err) + err.Error()})
+	}
+	stderrReader, err := session.StderrPipe()
+	if err != nil {
+		p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("error running command - %s: - %s", cmd, err) + err.Error()})
+	}
+
+	stdoutScanner := bufio.NewScanner(stdoutReader)
+	stderrScanner := bufio.NewScanner(stderrReader)
+
+	if err := session.Start(cmd); err != nil {
+		time.Sleep(time.Millisecond * 100)
+		p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("error running command - %s: - %s", cmd, err) + err.Error()})
+	}
+
+	for stdoutScanner.Scan() {
+		p.Send(render.LogMsg{LogLine: stdoutScanner.Text() + "\n"})
+		time.Sleep(time.Millisecond * 50)
+	}
+
+	for stderrScanner.Scan() {
+		p.Send(render.LogMsg{LogLine: stderrScanner.Text() + "\n"})
+		time.Sleep(time.Millisecond * 50)
+	}
+
+	if err := session.Wait(); err != nil {
+		p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("error running command - %s: - %s", cmd, err) + err.Error()})
+	}
+}
+
 func RunCommands(client *ssh.Client, commands []string) error {
 	for _, cmd := range commands {
 		_, _, err := RunCommand(client, cmd)
@@ -94,6 +135,13 @@ func RunCommands(client *ssh.Client, commands []string) error {
 			return err
 		}
 
+	}
+	return nil
+}
+
+func RunCommandsWithTUIHook(client *ssh.Client, commands []string, p *tea.Program) error {
+	for _, cmd := range commands {
+		RunCommandWithTUIHook(client, cmd, p)
 	}
 	return nil
 }

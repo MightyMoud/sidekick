@@ -164,9 +164,9 @@ func (m TuiModel) View() string {
 func getLogContainerStyle(m TuiModel) lipgloss.Style {
 	return lipgloss.
 		NewStyle().
-		Width(int(0.8 * float64(m.ViewportWidth))).
+		Width(int(0.98 * float64(m.ViewportWidth))).
 		Height(0).
-		MarginLeft(1).
+		MarginLeft(int(0.01 * float64(m.ViewportWidth))).
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("69")).
 		Foreground(lipgloss.Color("white")).Faint(true)

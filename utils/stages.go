@@ -39,6 +39,7 @@ var SetupStage = CommandsStage{
 		fmt.Sprintf("echo '%s' > ./setup.sh", SetupStageScript),
 		"chmod +x ./setup.sh",
 		"sudo ./setup.sh",
+		"rm ./setup.sh",
 	},
 }
 

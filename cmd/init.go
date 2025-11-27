@@ -31,7 +31,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func stage1LocalReqs(p *tea.Program) error {
+func stage1LocalReqs() error {
 	if _, err := exec.LookPath("sops"); err != nil {
 		cmd := exec.Command("brew", "install", "sops")
 		if err := cmd.Run(); err != nil {
@@ -47,7 +47,7 @@ func stage1LocalReqs(p *tea.Program) error {
 	return nil
 }
 
-func stage2Login(server string, p *tea.Program) (*ssh.Client, string, error) {
+func stage2Login(server string) (*ssh.Client, string, error) {
 	users := []string{"root", "sidekick"}
 	for _, user := range users {
 		client, err := utils.Login(server, user)
@@ -58,7 +58,7 @@ func stage2Login(server string, p *tea.Program) (*ssh.Client, string, error) {
 	return nil, "", fmt.Errorf("unable to establish SSH connection")
 }
 
-func stage3UserSetup(client *ssh.Client, loggedInUser string, p *tea.Program) error {
+func stage3UserSetup(client *ssh.Client, loggedInUser string) error {
 	hasSidekickUser := true
 	outChan, _, err := utils.RunCommand(client, "id -u sidekick")
 	if err != nil {
@@ -79,7 +79,22 @@ func stage3UserSetup(client *ssh.Client, loggedInUser string, p *tea.Program) er
 }
 
 func stage4VPSSetup(client *ssh.Client, p *tea.Program) error {
-	if err := utils.RunStage(client, utils.SetupStage); err != nil {
+	// get the linux distro
+	outChan, _, _ := utils.RunCommand(client, "grep '^ID=' /etc/os-release | awk -F'=' '{print $2}'")
+	linuxDistro := <-outChan
+	viper.Set("distro", linuxDistro)
+
+	// get docker platform id
+	cmdOutChan, _, _ := utils.RunCommand(client, "uname -m")
+	arch := <-cmdOutChan
+	if arch == "x86_64" {
+		viper.Set("platformID", "linux/amd64")
+	}
+	if arch == "aarch64" {
+		viper.Set("platformID", "linux/arm64")
+	}
+
+	if err := utils.RunCommandsWithTUIHook(client, utils.SetupStage.Commands, p); err != nil {
 		return err
 	}
 
@@ -118,7 +133,7 @@ func stage5Docker(client *ssh.Client, p *tea.Program) error {
 	}
 
 	if !dockerReady {
-		if err := utils.RunStage(client, utils.DockerStage); err != nil {
+		if err := utils.RunCommandsWithTUIHook(client, utils.DockerStage.Commands, p); err != nil {
 			return err
 		}
 	}
@@ -137,7 +152,7 @@ func stage6Traefik(client *ssh.Client, email string, p *tea.Program) error {
 
 	if !traefikSetup {
 		traefikStage := utils.GetTraefikStage(email)
-		if err := utils.RunStage(client, traefikStage); err != nil {
+		if err := utils.RunCommandsWithTUIHook(client, traefikStage.Commands, p); err != nil {
 			return err
 		}
 	}
@@ -195,9 +210,9 @@ var InitCmd = &cobra.Command{
 			render.MakeStage("Setting up your local env", "Installed local requirements successfully", false),
 			render.MakeStage("Logging in to VPS", "Logged in successfully", false),
 			render.MakeStage("Adding user Sidekick", "User Sidekick added successfully", false),
-			render.MakeStage("Setting up VPS", "VPS setup successfully", false),
-			render.MakeStage("Setting up Docker", "Docker setup successfully", false),
-			render.MakeStage("Setting up Traefik", "Traefik setup successfully", false),
+			render.MakeStage("Setting up VPS", "VPS setup successfully", true),
+			render.MakeStage("Setting up Docker", "Docker setup successfully", true),
+			render.MakeStage("Setting up Traefik", "Traefik setup successfully", true),
 		}
 
 		p := tea.NewProgram(render.TuiModel{
@@ -208,15 +223,17 @@ var InitCmd = &cobra.Command{
 			AllDone:     false,
 		})
 
+		utils.Login(server, "root")
+
 		go func() {
-			if err := stage1LocalReqs(p); err != nil {
+			if err := stage1LocalReqs(); err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Local requirements check failed: %s", err)})
 				return
 			}
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			sshClient, loggedInUser, err := stage2Login(server, p)
+			sshClient, loggedInUser, err := stage2Login(server)
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Login failed: %s", err)})
 				return
@@ -224,7 +241,7 @@ var InitCmd = &cobra.Command{
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			if err := stage3UserSetup(sshClient, loggedInUser, p); err != nil {
+			if err := stage3UserSetup(sshClient, loggedInUser); err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("User setup failed: %s", err)})
 				return
 			}
@@ -268,7 +285,6 @@ var InitCmd = &cobra.Command{
 			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}
-
 	},
 }
 

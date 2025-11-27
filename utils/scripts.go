@@ -84,21 +84,23 @@ wait_for_locks() {
     done
 }
 
-echo "Updating SSH config..."
+echo "\033[0;32mUpdating SSH config...\033[0m"
 sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config && sudo systemctl restart ssh
 sudo systemctl restart ssh
 
+echo "\033[0;32mUpdating Packages...\033[0m"
 wait_for_locks
 sudo apt-get update -y
 
 wait_for_locks
 sudo apt-get upgrade -y
 
+echo "\033[0;32mInstalling Necessities ...\033[0m"
 wait_for_locks
 sudo apt-get install -y age ca-certificates curl vim
 
-echo "Installing sops..."
-curl -LO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+echo "\033[0;32mInstalling SOPS...\033[0m"
+curl -sLO https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
 sudo mv sops-v3.9.0.linux.amd64 /usr/local/bin/sops
 sudo chmod +x /usr/local/bin/sops
 `
