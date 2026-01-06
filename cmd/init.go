@@ -47,8 +47,16 @@ func stage1LocalReqs() error {
 	return nil
 }
 
-func stage2Login(server string) (*ssh.Client, string, error) {
-	users := []string{"root", "sidekick"}
+func stage2Login(server string, customUser string) (*ssh.Client, string, error) {
+	var users []string
+
+	if customUser != "" {
+		users = append(users, customUser)
+	} else {
+		users = append(users, "root")
+	}
+	users = append(users, "sidekick")
+
 	for _, user := range users {
 		client, err := utils.Login(server, user)
 		if err == nil {
@@ -70,8 +78,8 @@ func stage3UserSetup(client *ssh.Client, loggedInUser string) error {
 		}
 	}
 
-	if !hasSidekickUser && loggedInUser == "root" {
-		if err := utils.RunStage(client, utils.UsersetupStage); err != nil {
+	if !hasSidekickUser {
+		if err := utils.RunStage(client, utils.UsersetupStage(loggedInUser)); err != nil {
 			return err
 		}
 	}
@@ -179,6 +187,7 @@ var InitCmd = &cobra.Command{
 		skipPromptsFlag, _ := cmd.Flags().GetBool("yes")
 		server, _ := cmd.Flags().GetString("server")
 		certEmail, _ := cmd.Flags().GetString("email")
+		sshUser, _ := cmd.Flags().GetString("user")
 
 		if server == "" {
 			server = render.GenerateTextQuestion("Please enter the IPv4 Address of your VPS", "", "")
@@ -192,6 +201,10 @@ var InitCmd = &cobra.Command{
 			if certEmail == "" {
 				log.Fatalf("An email is needed before you proceed")
 			}
+		}
+
+		if sshUser == "" && !skipPromptsFlag {
+			sshUser = render.GenerateTextQuestion("Please enter the SSH username", "root", "default: root")
 		}
 
 		publicKey := viper.GetString("publicKey")
@@ -223,7 +236,7 @@ var InitCmd = &cobra.Command{
 			AllDone:     false,
 		})
 
-		utils.Login(server, "root")
+		utils.Login(server, sshUser)
 
 		go func() {
 			if err := stage1LocalReqs(); err != nil {
@@ -233,7 +246,7 @@ var InitCmd = &cobra.Command{
 			time.Sleep(time.Millisecond * 100)
 			p.Send(render.NextStageMsg{})
 
-			sshClient, loggedInUser, err := stage2Login(server)
+			sshClient, loggedInUser, err := stage2Login(server, sshUser)
 			if err != nil {
 				p.Send(render.ErrorMsg{ErrorStr: fmt.Sprintf("Login failed: %s", err)})
 				return
@@ -318,5 +331,6 @@ func init() {
 
 	InitCmd.Flags().StringP("server", "s", "", "Set the IP address of your Server")
 	InitCmd.Flags().StringP("email", "e", "", "An email address to be used for SSL certs")
+	InitCmd.Flags().StringP("user", "u", "", "SSH username to use for initial connection")
 	InitCmd.Flags().BoolP("yes", "y", false, "Skip all validation prompts")
 }

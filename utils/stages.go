@@ -20,17 +20,26 @@ import (
 	"strings"
 )
 
-var UsersetupStage = CommandsStage{
-	SpinnerSuccessMessage: "New user created successfully",
-	SpinnerFailMessage:    "Error creating a new user for the machine",
-	Commands: []string{
-		"sudo useradd -m -s /bin/bash -G sudo sidekick",
-		`echo "sidekick ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/sidekick`,
-		"mkdir -p /home/sidekick/.ssh/",
-		"sudo cat /root/.ssh/authorized_keys | sudo tee -a /home/sidekick/.ssh/authorized_keys",
-		"sudo chown sidekick:sidekick /home/sidekick/.ssh/authorized_keys",
-		"sudo chmod 600 /home/sidekick/.ssh/authorized_keys",
-	},
+func UsersetupStage(currentUser string) CommandsStage {
+	// Determine the source of SSH keys based on current user
+	sshKeysSource := "~/.ssh/authorized_keys"
+	if currentUser == "root" {
+		sshKeysSource = "/root/.ssh/authorized_keys"
+	}
+
+	return CommandsStage{
+		SpinnerSuccessMessage: "New user created successfully",
+		SpinnerFailMessage:    "Error creating a new user for the machine",
+		Commands: []string{
+			"sudo useradd -m -s /bin/bash -G sudo sidekick || true",
+			`echo "sidekick ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/sidekick`,
+			"sudo mkdir -p /home/sidekick/.ssh/",
+			fmt.Sprintf("sudo cp %s /home/sidekick/.ssh/authorized_keys", sshKeysSource),
+			"sudo chown -R sidekick:sidekick /home/sidekick/.ssh/",
+			"sudo chmod 700 /home/sidekick/.ssh/",
+			"sudo chmod 600 /home/sidekick/.ssh/authorized_keys",
+		},
+	}
 }
 
 var SetupStage = CommandsStage{
